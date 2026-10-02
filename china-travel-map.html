@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>中国旅游景点分类地图 · 交互式导览</title>
+<script>
+  window._TMapSecurityConfig = {
+    serviceHost: 'http://127.0.0.1:__WB_HTTP_PORT__/_TMapService/_wbt/__WB_TMAP_SECRET__',
+  };
+</script>
+<script src="https://map.qq.com/api/gljs?v=1.exp&libraries=service"></script>
+<style>
+  :root{
+    --bg:#f2f5f9;
+    --panel:#ffffff;
+    --line:#e3e8ef;
+    --text:#1f2937;
+    --muted:#6b7280;
+    --primary:#0f7b8a;
+    --primary-soft:#e6f4f6;
+    --accent:#e4572e;
+    --shadow:0 2px 10px rgba(16,24,40,.08);
+    --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;
+    background:var(--bg);color:var(--text);overflow:hidden;
+  }
+  button{font-family:inherit;cursor:pointer;}
+  #app{display:flex;flex-direction:column;height:100vh;}
+
+  /* ---------- 顶部栏 ---------- */
+  header{
+    display:flex;align-items:center;gap:14px;
+    padding:10px 16px;background:var(--panel);
+    border-bottom:1px solid var(--line);box-shadow:var(--shadow);z-index:20;
+    flex:0 0 auto;
+  }
+  .brand{font-size:18px;font-weight:700;letter-spacing:.5px;white-space:nowrap;}
+  .brand small{display:block;font-size:11px;font-weight:400;color:var(--muted);letter-spacing:0;}
+  .stat{font-size:12px;color:var(--muted);}
+  .stat b{color:var(--primary);font-size:14px;}
+  .grow{flex:1;}
+  .btn{
+    border:1px solid var(--line);background:#fff;color:var(--text);
+    padding:6px 12px;border-radius:8px;font-size:13px;transition:.15s;white-space:nowrap;
+  }
+  .btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft);}
+  .btn.primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .btn.primary:hover{background:#0c6673;color:#fff;}
+  .btn.danger{color:#b42318;border-color:#f3c6c0;}
+  .btn.danger:hover{background:#fef3f2;border-color:#b42318;color:#b42318;}
+  .btn.sm{padding:3px 8px;font-size:12px;border-radius:6px;}
+
+  /* ---------- 主体 ---------- */
+  main{display:flex;flex:1;min-height:0;}
+  aside{
+    width:330px;flex:0 0 330px;background:var(--panel);
+    border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;
+  }
+  .panel{border-bottom:1px solid var(--line);display:flex;flex-direction:column;min-height:0;}
+  .panel.scroll{flex:1;}
+  .panel-hd{
+    display:flex;align-items:center;gap:8px;padding:10px 12px 8px;
+  }
+  .panel-hd h3{margin:0;font-size:14px;}
+  .panel-hd .sub{font-size:11px;color:var(--muted);flex:1;text-align:right;}
+
+  /* 分类列表 */
+  #catList{max-height:240px;overflow:auto;padding:0 8px 10px;}
+  .cat-item{
+    display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;
+    border:1px solid var(--line);border-radius:10px;cursor:pointer;transition:.15s;background:#fff;
+  }
+  .cat-item:hover{background:#f8fafc;border-color:#cfe0e3;}
+  .cat-item.active{border-color:var(--primary);background:var(--primary-soft);}
+  .cat-item .dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px;}
+  .cat-item .ic{display:flex;align-items:center;justify-content:center;flex:0 0 24px;line-height:0;}
+  .cat-item .ic svg{filter:drop-shadow(0 1px 1px rgba(16,24,40,.18));}
+  .cat-item .cname{flex:1;font-size:13px;font-weight:600;}
+  .cat-item .cnt{font-size:11px;color:var(--muted);background:#f1f5f9;padding:2px 6px;border-radius:20px;}
+  .cat-item .ops{display:flex;gap:4px;}
+  .cat-item .ops button{border:none;background:transparent;color:var(--muted);font-size:13px;padding:2px 4px;border-radius:4px;}
+  .cat-item .ops button:hover{color:var(--primary);background:#fff;}
+  .multi-row{display:flex;align-items:center;gap:6px;padding:0 12px 8px;font-size:12px;color:var(--muted);}
+  .check{
+    width:16px;height:16px;border:1.5px solid #cbd5e1;border-radius:4px;display:inline-flex;
+    align-items:center;justify-content:center;font-size:11px;color:#fff;flex:0 0 16px;
+  }
+  .check.on{background:var(--primary);border-color:var(--primary);}
+
+  /* 景点清单 */
+  .toolbar{display:flex;gap:6px;padding:0 12px 8px;}
+  .toolbar input,.toolbar select{
+    flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px;outline:none;
+  }
+  .toolbar input:focus,.toolbar select:focus{border-color:var(--primary);}
+  #spotList{flex:1;overflow:auto;padding:0 8px 12px;}
+  .spot-item{
+    border:1px solid var(--line);border-radius:10px;padding:9px 10px;margin-bottom:8px;cursor:pointer;background:#fff;
+  }
+  .spot-item:hover{border-color:var(--primary);background:#fbfeff;}
+  .spot-item.active{border-color:var(--primary);background:var(--primary-soft);}
+  .spot-item .t{display:flex;align-items:center;gap:6px;}
+  .spot-item .t b{font-size:13.5px;}
+  .spot-item .chip{font-size:10px;padding:1px 6px;border-radius:20px;color:#fff;}
+  .spot-item .addr{font-size:11px;color:var(--muted);margin-top:3px;}
+  .spot-item .d{
+    font-size:12px;color:#4b5563;margin-top:5px;line-height:1.5;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .spot-item .ops{margin-top:6px;display:flex;gap:6px;justify-content:flex-end;}
+  .empty{padding:20px 12px;text-align:center;color:var(--muted);font-size:12px;}
+
+  /* ---------- 地图 ---------- */
+  #mapwrap{position:relative;flex:1;min-width:0;}
+  #map{position:absolute;inset:0;}
+  .overlay{
+    position:absolute;background:rgba(255,255,255,.94);border:1px solid var(--line);
+    border-radius:10px;box-shadow:var(--shadow);padding:8px 10px;font-size:12px;z-index:1200;
+  }
+  #legend{left:12px;top:12px;max-width:210px;}
+  #legend .lg-t{font-weight:700;margin-bottom:6px;font-size:12px;}
+  #legend .lg-i{display:flex;align-items:center;gap:6px;margin-bottom:4px;color:#374151;}
+  #legend .lg-i .dot{display:inline-block;flex:0 0 10px;}
+  .map-tools{right:12px;top:12px;display:flex;flex-direction:column;gap:6px;padding:8px;width:132px;}
+  .map-tools .bm-title{font-size:11px;color:var(--muted);margin-bottom:2px;}
+  .map-tools .bm{width:100%;text-align:left;}
+  .map-tools .bm.on{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .map-tools .sep{height:1px;background:var(--line);margin:3px 0;}
+  .sp-err{color:#b42318;background:#fef3f2;border:1px solid #f3c6c0;border-radius:8px;
+    padding:8px 10px;font-size:12.5px;margin-top:8px;line-height:1.6;}
+  #hint{
+    left:12px;bottom:12px;color:var(--muted);max-width:300px;line-height:1.6;
+  }
+  .iw{
+    width:270px;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(16,24,40,.18);
+    overflow:hidden;border:1px solid var(--line);font-size:13px;
+  }
+  .iw-hd{padding:8px 12px;color:#fff;display:flex;align-items:center;gap:7px;}
+  .iw-hd svg{flex:0 0 auto;}
+  .iw-hd b{font-size:14px;flex:1;}
+  .iw-close{cursor:pointer;opacity:.85;font-size:16px;line-height:1;}
+  .iw-bd{padding:8px 12px 10px;color:#374151;}
+  .iw-bd .addr{font-size:11.5px;color:var(--muted);margin-bottom:6px;}
+  .iw-bd .d{font-size:12.5px;line-height:1.6;max-height:78px;overflow:auto;white-space:pre-wrap;}
+  .iw-ft{padding:0 12px 10px;display:flex;gap:6px;}
+  .iw-ft button{flex:1;}
+
+  /* ---------- 右侧详情抽屉 ---------- */
+  #drawer{
+    position:absolute;right:0;top:0;bottom:0;width:360px;background:#fff;z-index:1300;
+    border-left:1px solid var(--line);box-shadow:-6px 0 18px rgba(16,24,40,.10);
+    display:flex;flex-direction:column;transform:translateX(105%);transition:transform .25s ease;
+  }
+  #drawer.open{transform:translateX(0);}
+  #drawer .d-hd{padding:14px 16px;color:#fff;}
+  #drawer .d-hd h2{margin:0;font-size:18px;}
+  #drawer .d-hd .meta{font-size:12px;opacity:.92;margin-top:4px;}
+  #drawer .d-bd{padding:14px 16px 24px;overflow:auto;font-size:13.5px;line-height:1.8;color:#374151;}
+  #drawer .d-bd img{width:100%;border-radius:10px;margin:8px 0;}
+  #drawer .d-bd p{margin:0 0 10px;white-space:pre-wrap;}
+  #drawer .d-bd .kv{font-size:12px;color:var(--muted);margin-bottom:10px;}
+  #drawer .d-ft{padding:10px 16px;border-top:1px solid var(--line);display:flex;gap:8px;}
+  .close-x{position:absolute;right:10px;top:10px;border:none;background:rgba(255,255,255,.25);color:#fff;
+    width:26px;height:26px;border-radius:50%;font-size:15px;line-height:1;}
+
+  /* ---------- 弹窗 ---------- */
+  .mask{
+    position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:99999;
+    display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+  .mask.hidden,.hidden{display:none !important;}
+  .modal{
+    background:#fff;border-radius:14px;width:100%;max-width:520px;max-height:88vh;overflow:auto;
+    box-shadow:0 20px 50px rgba(16,24,40,.25);
+  }
+  .modal .m-hd{padding:14px 18px;border-bottom:1px solid var(--line);font-size:16px;font-weight:700;
+    display:flex;align-items:center;}
+  .modal .m-bd{padding:16px 18px;}
+  .modal .m-ft{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12.5px;color:#374151;margin-bottom:5px;font-weight:600;}
+  .field input,.field textarea,.field select{
+    width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13.5px;
+    font-family:inherit;outline:none;color:var(--text);
+  }
+  .field textarea{min-height:130px;resize:vertical;line-height:1.7;}
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--primary);}
+  .field .tip{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.5;}
+  .row2{display:flex;gap:10px;}
+  .row2>div{flex:1;}
+  .cand{border:1px solid var(--line);border-radius:8px;max-height:180px;overflow:auto;margin-top:8px;}
+  .cand div{padding:7px 10px;font-size:12.5px;border-bottom:1px solid #f1f5f9;cursor:pointer;}
+  .cand div:hover{background:var(--primary-soft);}
+  .cand div.sel{background:var(--primary-soft);font-weight:600;}
+  .cand div small{color:var(--muted);display:block;font-weight:400;}
+  .swatches{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+  .swatches span{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;}
+  .swatches span.on{border-color:#111827;}
+  .shapes{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+  .shape{
+    border:1px solid var(--line);border-radius:8px;padding:5px 2px 3px;text-align:center;
+    cursor:pointer;font-size:10.5px;color:var(--muted);background:#fff;
+  }
+  .shape svg{display:block;margin:0 auto 2px;}
+  .shape:hover{border-color:#cfe0e3;background:#f8fafc;}
+  .shape.on{border-color:var(--primary);background:var(--primary-soft);color:var(--primary);font-weight:600;}
+  /* ===== 账号 / 登录 ===== */
+  #btnAccount{min-width:104px;}
+  .acct-me{
+    display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:12px;
+    background:var(--primary-soft);border:1px solid #bfe3e8;border-radius:10px;
+  }
+  .acct-me .av{
+    width:36px;height:36px;border-radius:50%;background:var(--primary);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex:0 0 36px;
+  }
+  .acct-me .n{font-weight:700;font-size:14px;}
+  .acct-me .s{font-size:11px;color:var(--muted);margin-top:2px;}
+  .seg{display:flex;gap:4px;background:#f1f5f9;padding:3px;border-radius:10px;margin-bottom:12px;}
+  .seg button{flex:1;border:none;background:transparent;padding:7px 0;border-radius:8px;font-size:13px;color:var(--muted);cursor:pointer;}
+  .seg button.on{background:#fff;color:var(--primary);font-weight:700;box-shadow:0 1px 2px rgba(16,24,40,.08);}
+  .acct-err{display:none;margin-top:8px;padding:8px 10px;border-radius:8px;background:#fee4e2;border:1px solid #fda29b;color:#b42318;font-size:12.5px;}
+  .acct-err.show{display:block;}
+  .acct-ok{display:none;margin-top:8px;padding:8px 10px;border-radius:8px;background:#e6f4f6;border:1px solid #bfe3e8;color:#0f7b8a;font-size:12.5px;}
+  .acct-ok.show{display:block;}
+  .chkline{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#374151;margin-top:2px;cursor:pointer;}
+  .chkline input{width:15px;height:15px;}
+  .ulist{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:8px;}
+  .ulist .u{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;}
+  .ulist .u:last-child{border-bottom:none;}
+  .ulist .u:hover{background:#f8fafc;}
+  .ulist .uav{width:26px;height:26px;border-radius:50%;background:#0ea5b7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 26px;font-weight:700;}
+  .ulist .ud{flex:1;min-width:0;}
+  .ulist small{display:block;color:var(--muted);font-size:11px;}
+  .snap{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px;font-size:12.5px;}
+  .snap .st{flex:1;min-width:0;}
+  .snap small{display:block;color:var(--muted);font-size:11px;}
+  .toast{
+    position:fixed;left:50%;bottom:36px;transform:translateX(-50%);background:#111827;color:#fff;
+    padding:9px 16px;border-radius:20px;font-size:13px;z-index:100000;opacity:0;transition:.25s;pointer-events:none;
+  }
+  .toast.show{opacity:1;}
+  .help li{margin-bottom:6px;line-height:1.7;}
+  @media (max-width:900px){
+    aside{width:270px;flex:0 0 270px;}
+    #drawer{width:100%;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">🗺️ 中国旅游景点分类地图<small>自建分类 · 点位标注 · 图文详解</small></div>
+    <div class="stat" id="stat"></div>
+    <div class="grow"></div>
+    <button class="btn primary" id="btnAddCat">＋ 新分类</button>
+    <button class="btn" id="btnAddSpot">＋ 新景点</button>
+    <button class="btn" id="btnExport">导出数据</button>
+    <button class="btn" id="btnImport">导入数据</button>
+    <button class="btn" id="btnHelp">使用说明</button>
+    <button class="btn" id="btnAccount">👤 登录 / 注册</button>
+    <input type="file" id="fileImport" accept="application/json,.json" hidden />
+  </header>
+
+  <main>
+    <aside>
+      <section class="panel">
+        <div class="panel-hd"><h3>我的分类</h3><span class="sub">点击分类 → 地图只看该类</span></div>
+        <div id="catList"></div>
+        <div class="multi-row">
+          <span class="check" id="multiMode"></span><label for="multiMode" style="cursor:pointer">多选叠加模式（可同时显示多个分类）</label>
+        </div>
+      </section>
+
+      <section class="panel scroll">
+        <div class="panel-hd"><h3>景点清单</h3><span class="sub" id="listCount"></span></div>
+        <div class="toolbar">
+          <input id="spotSearch" placeholder="🔍 搜索名称 / 地址 / 简介关键词" />
+        </div>
+        <div class="toolbar">
+          <select id="listFilter"></select>
+          <button class="btn sm" id="btnFit2">地图适配</button>
+        </div>
+        <div id="spotList"></div>
+      </section>
+    </aside>
+
+    <div id="mapwrap">
+      <div id="map"></div>
+      <div class="overlay" id="legend"></div>
+      <div class="map-tools overlay">
+        <div class="bm-title">底图</div>
+        <button class="btn sm bm" data-bm="terrain">⛰️ 地形晕渲图</button>
+        <button class="btn sm bm" data-bm="vector">🗺️ 标准矢量图</button>
+        <button class="btn sm bm" data-bm="satellite">🛰️ 卫星影像图</button>
+        <button class="btn sm" id="tkBtn">地形图密钥</button>
+        <div class="sep"></div>
+        <button class="btn sm" id="btnReset">重置全国视野</button>
+        <button class="btn sm" id="btnFit">适配当前点位</button>
+      </div>
+      <div class="overlay" id="tkTip" style="display:none;left:12px;top:150px;max-width:280px;line-height:1.7">
+        <b>地形图需要天地图密钥</b><br/>
+        腾讯地图未提供地形晕渲服务，地形图采用<b>国家测绘局天地图</b>（合规底图源）。点右上角「地形图密钥」粘贴你免费申请的 Key 即可启用；未配置时暂以卫星影像显示。
+      </div>
+      <div class="overlay" id="hint">提示：点击左侧分类筛选；点击地图上的图钉或右侧列表查看详细介绍；点“＋ 新景点”可自行录入，支持按名称自动定位或直接点地图取点。</div>
+      <div class="overlay" id="fileWarn" style="display:none;left:50%;transform:translateX(-50%);top:12px;max-width:540px;background:#fff7ed;border-color:#fed7aa;color:#9a3412;line-height:1.7">
+        <b>当前是 file:// 本地文件方式打开，腾讯地图不支持该协议，底图不会显示。</b><br/>
+        请用本页预览链接（http）打开，或在本文件夹执行 <code>python -m http.server 8000</code> 后访问 http://localhost:8000/china-travel-map.html。分类、景点录入与详情查看不受影响。
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 详情抽屉 -->
+<div id="drawer">
+  <div class="d-hd" id="dHead">
+    <button class="close-x" id="dClose">✕</button>
+    <h2 id="dTitle"></h2>
+    <div class="meta" id="dMeta"></div>
+  </div>
+  <div class="d-bd" id="dBody"></div>
+  <div class="d-ft">
+    <button class="btn" id="dLocate">在地图定位</button>
+    <button class="btn" id="dEdit">编辑</button>
+    <button class="btn danger" id="dDel">删除</button>
+  </div>
+</div>
+
+<!-- 分类弹窗 -->
+<div class="mask hidden" id="catMask">
+  <div class="modal">
+    <div class="m-hd">分类设置</div>
+    <div class="m-bd">
+      <div class="field">
+        <label>分类名称（必填）</label>
+        <input id="catName" placeholder="如：名山 / 名河 / 古桥 / 古镇 / 园林 / 石窟" />
+      </div>
+      <div class="field">
+        <label>图标（一个 emoji）</label>
+        <input id="catIcon" placeholder="⛰️" maxlength="4" />
+      </div>
+      <div class="field">
+        <label>主题色</label>
+        <div class="swatches" id="catSwatches"></div>
+      </div>
+      <div class="field">
+        <label>地图图标样式</label>
+        <div class="shapes" id="catShapes"></div>
+        <div class="tip">该分类的景点在地图上会用这个图标 + 主题色显示。</div>
+      </div>
+      <div class="field">
+        <label>分类说明（可选）</label>
+        <input id="catDesc" placeholder="如：以自然山岳景观为主的目的地" />
+      </div>
+    </div>
+    <div class="m-ft">
+      <button class="btn" id="catCancel">取消</button>
+      <button class="btn primary" id="catSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 景点弹窗 -->
+<div class="mask hidden" id="spotMask">
+  <div class="modal">
+    <div class="m-hd" id="spotMaskTitle">添加景点</div>
+    <div class="m-bd">
+      <div class="field">
+        <label>所属分类（必填）</label>
+        <select id="spCat"></select>
+      </div>
+      <div class="field">
+        <label>景点名称（必填）</label>
+        <input id="spName" placeholder="如：拙政园" />
+      </div>
+      <div class="field">
+        <label>所在地区 / 地址（选填，便于检索定位）</label>
+        <input id="spAddr" placeholder="如：江苏省苏州市姑苏区东北街178号" />
+      </div>
+      <div class="field">
+        <label>经纬度（GCJ-02 火星坐标）</label>
+        <div class="row2">
+          <div><input id="spLat" placeholder="纬度 如 31.3240" /></div>
+          <div><input id="spLng" placeholder="经度 如 120.6290" /></div>
+        </div>
+        <div class="tip">不知道坐标？点下面任一按钮：按名称自动检索，或直接在地图上点一下取点。</div>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn sm" id="btnGeo">🔍 按名称自动定位</button>
+          <button class="btn sm" id="btnPick">📌 在地图上取点</button>
+        </div>
+        <div class="cand hidden" id="geoCand"></div>
+        <div class="sp-err hidden" id="spErr"></div>
+      </div>
+      <div class="field">
+        <label>一句话标签（选填）</label>
+        <input id="spTags" placeholder="如：江南园林之首 · 世界文化遗产" />
+      </div>
+      <div class="field">
+        <label>详细介绍（支持换行分段）</label>
+        <textarea id="spDesc" placeholder="输入位置、历史沿革、核心看点、建议游览时间等…"></textarea>
+      </div>
+      <div class="field">
+        <label>配图链接（选填，http 开头）</label>
+        <input id="spImg" placeholder="https://...jpg" />
+      </div>
+    </div>
+    <div class="m-ft">
+      <button class="btn" id="spCancel">取消</button>
+      <button class="btn primary" id="spSave">保存并上图</button>
+    </div>
+  </div>
+</div>
+
+<!-- 天地图密钥弹窗 -->
+<div class="mask hidden" id="tkMask">
+  <div class="modal" style="max-width:480px">
+    <div class="m-hd">地形图密钥设置（天地图）</div>
+    <div class="m-bd">
+      <p style="font-size:13px;line-height:1.75;color:#374151;margin:0 0 12px">
+        腾讯位置服务未提供地形晕渲底图，因此「地形晕渲图」使用<b>国家测绘局天地图</b>（合规底图源）的 ter_w 图层。<br/>
+        申请方式（免费，约 2 分钟）：打开 <b>天地图开放平台 console.tianditu.gov.cn</b> → 注册登录 → 「应用管理 / 创建应用」→ 复制生成的 Key，粘贴到下面保存即可。
+      </p>
+      <div class="field">
+        <label>天地图 Key（tk）</label>
+        <input id="tkInput" placeholder="在此粘贴天地图密钥" />
+        <div class="tip">密钥只保存在你本机浏览器的 localStorage，不会上传到任何服务器。</div>
+      </div>
+    </div>
+    <div class="m-ft">
+      <button class="btn" id="tkCancel">取消</button>
+      <button class="btn primary" id="tkSave">保存并切换到地形图</button>
+    </div>
+  </div>
+</div>
+
+<!-- 账号弹窗 -->
+<div class="mask hidden" id="authMask">
+  <div class="modal" style="max-width:440px">
+    <div class="m-hd" id="authTitle">账号</div>
+    <div class="m-bd">
+
+      <!-- 未登录：登录 / 注册 -->
+      <div id="authGuest">
+        <div class="seg" id="authSeg">
+          <button class="on" data-tab="login">登录</button>
+          <button data-tab="reg">注册新账号</button>
+        </div>
+
+        <div id="paneLogin">
+          <div class="field">
+            <label>用户名</label>
+            <input id="lgUser" autocomplete="username" placeholder="输入用户名" />
+          </div>
+          <div class="field">
+            <label>密码</label>
+            <input id="lgPwd" type="password" autocomplete="current-password" placeholder="输入密码" />
+          </div>
+          <label class="chkline"><input type="checkbox" id="lgKeep" checked /> 保持登录（30 天内免登录）</label>
+          <div class="acct-err" id="lgErr"></div>
+          <button class="btn primary" id="lgBtn" style="width:100%;margin-top:10px">登录</button>
+          <div class="tip" style="margin-top:8px">
+            不登录也能正常使用，数据保存在「游客」名下。注册账号后，每个账号拥有<b>各自独立</b>的分类与景点数据。
+          </div>
+          <div id="userListWrap" class="hidden">
+            <div class="tip" style="margin-top:10px">本机已有账号，点一下可快速填入用户名：</div>
+            <div class="ulist" id="userList"></div>
+          </div>
+        </div>
+
+        <div id="paneReg" class="hidden">
+          <div class="field">
+            <label>用户名（3—16 位，中英文/数字均可）</label>
+            <input id="rgUser" autocomplete="username" placeholder="如：旅行者老李" />
+          </div>
+          <div class="field">
+            <label>密码（至少 6 位）</label>
+            <input id="rgPwd" type="password" autocomplete="new-password" placeholder="设置登录密码" />
+          </div>
+          <div class="field">
+            <label>确认密码</label>
+            <input id="rgPwd2" type="password" autocomplete="new-password" placeholder="再输入一次密码" />
+          </div>
+          <label class="chkline"><input type="checkbox" id="rgCarry" checked /> 把当前「游客」数据带入这个新账号</label>
+          <div class="acct-err" id="rgErr"></div>
+          <button class="btn primary" id="rgBtn" style="width:100%;margin-top:10px">注册并登录</button>
+          <div class="tip" style="margin-top:8px">
+            账号与密码只保存在<b>本机浏览器</b>（密码经加盐哈希处理，不明文存储），不会上传到任何服务器，因此<b>离线可用</b>。
+          </div>
+        </div>
+      </div>
+
+      <!-- 已登录 -->
+      <div id="authUser" class="hidden">
+        <div class="acct-me">
+          <div class="av" id="acAvatar">U</div>
+          <div style="flex:1;min-width:0">
+            <div class="n" id="acName">—</div>
+            <div class="s" id="acMeta">—</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="btn sm" id="acBackup">📦 创建备份点</button>
+          <button class="btn sm" id="acExport">⬇ 导出 JSON</button>
+          <button class="btn sm" id="acPwd">🔑 修改密码</button>
+          <button class="btn sm" id="acSwitch">🔄 切换账号</button>
+          <button class="btn sm" id="acLogout">退出登录</button>
+        </div>
+
+        <div class="acct-ok" id="acMsg"></div>
+
+        <div id="acPwdBox" class="hidden" style="border-top:1px solid var(--line);padding-top:12px;margin-top:12px">
+          <div class="field"><label>原密码</label><input id="pwOld" type="password" /></div>
+          <div class="field"><label>新密码（至少 6 位）</label><input id="pwNew" type="password" /></div>
+          <div class="acct-err" id="pwErr"></div>
+          <button class="btn primary sm" id="pwSave" style="margin-top:8px">确认修改</button>
+        </div>
+
+        <div id="acSnapBox" style="border-top:1px solid var(--line);padding-top:12px;margin-top:12px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">本地备份点（最近 8 次，可一键回滚）</div>
+          <div id="snapList"></div>
+          <div class="tip" style="margin-top:4px">
+            云同步未开启，备份保存在本机浏览器。要跨设备/长期保存，请用「导出 JSON」把文件存到网盘或 U 盘，再到另一台机器「导入数据」。
+          </div>
+        </div>
+
+        <div id="acDanger" style="border-top:1px solid var(--line);padding-top:12px;margin-top:12px">
+          <button class="btn sm danger" id="acDel">删除本账号及其全部数据</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="m-ft"><button class="btn" id="authClose">关闭</button></div>
+  </div>
+</div>
+
+<!-- 说明弹窗 -->
+<div class="mask hidden" id="helpMask">
+  <div class="modal">
+    <div class="m-hd">使用说明</div>
+    <div class="m-bd help" style="font-size:13.5px;line-height:1.8">
+      <ol style="padding-left:20px;margin:0">
+        <li><b>建分类</b>：点右上「＋ 新分类」，输入名称（名山、名河、古桥、古镇、园林…），再挑 emoji、主题色和<b>地图图标样式</b>（山峰 / 水波 / 古桥 / 屋舍 / 树木 / 楼塔 / 星形 / 旗帜 / 圆点 / 菱形 / 心形，共 12 种），随时可增改删。</li>
+        <li><b>录景点</b>：点「＋ 新景点」→ 选分类 → 填名称 → 点「🔍 按名称自动定位」自动取坐标（也可手填经纬度）→ 写详细介绍 → 保存，点位立刻出现在地图上。</li>
+        <li><b>看点位</b>：点击左侧分类，地图只显示该类别的点位并自动缩放到合适视野；清单同步过滤。开启「多选叠加模式」可同时看若干个分类。</li>
+        <li><b>看详情</b>：点地图上的彩色图钉 → 弹出信息窗；点「查看详情」或左侧列表项 → 右侧抽屉展示完整介绍。</li>
+        <li><b>注册 / 登录</b>：点右上「👤 登录 / 注册」创建账号。账号只存在<b>本机浏览器</b>，离线可用；<b>每个账号的数据相互独立</b>，登录自己的账号就只看到自己的分类与景点。不登录也能用，数据归「游客」。</li>
+        <li><b>备份与恢复</b>：登录后点「👤 你的名字」→「创建备份点」，会保存最近 8 次快照，随时一键回滚；要换电脑或长期保存，用「导出 JSON」存文件，再到另一台机器「导入数据」。云同步未开启，数据不上传服务器。</li>
+        <li><b>数据保存</b>：所有内容存在本机浏览器 localStorage，可随时「导出数据」备份成 JSON 或「导入数据」恢复。</li>
+        <li><b>换底图</b>：地图右上角可切换「地形晕渲图 / 标准矢量图 / 卫星影像图」。地形晕渲由国家测绘局天地图提供，需免费申请 Key 后点「地形图密钥」填入；未填时自动回退为卫星影像。</li>
+        <li><b>加不上的排查</b>：录入景点时若没填经纬度，保存会自动按名称定位；定位失败可点「📌 在地图上取点」，在地图上点一下即可自动填坐标。</li>
+      </ol>
+      <p style="color:#6b7280;font-size:12.5px;margin:12px 0 0">地图服务：腾讯位置服务（符合国内地图合规要求）。快捷键：Esc 关闭弹窗/抽屉。</p>
+    </div>
+    <div class="m-ft"><button class="btn primary" id="helpClose">知道了</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 数据层 ============ */
+const STORE = 'cn_travel_map_v1';
+const PALETTE = ['#2e7d32','#1565c0','#8d6e63','#e08a00','#7b1fa2','#c62828','#00838f','#5d4037','#ad1457','#4527a0'];
+
+/* ============ 本地账号系统（离线可用，数据按账号隔离） ============ */
+const U_STORE = 'ctm_users_v1', S_STORE = 'ctm_session_v1', SESSION_MS = 30 * 24 * 3600 * 1000;
+function lsGet(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+
+let users = lsGet(U_STORE, []);
+let session = lsGet(S_STORE, null);
+if(session && (!session.uid || !users.some(u => u.id === session.uid))) session = null;
+if(session && session.t && Date.now() - session.t > SESSION_MS) session = null;
+let currentUser = session ? (users.find(u => u.id === session.uid) || null) : null;
+if(currentUser){ currentUser.lastLogin = Date.now(); lsSet(U_STORE, users); lsSet(S_STORE, { uid: currentUser.id, name: currentUser.name, t: Date.now() }); }
+
+const dataKey = () => currentUser ? (STORE + '_u_' + currentUser.id) : STORE;
+const snapKey = () => dataKey() + '_snaps';
+
+/* 密码哈希：优先 Web Crypto SHA-256（localhost / https 下可用），否则退化为加盐摘要 */
+function _fnv(s, seed){
+  let h = seed >>> 0;
+  for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h >>> 0;
+}
+function _weak(s){
+  return [_fnv(s, 2166136261), _fnv(s + '#', 486187739), _fnv('^' + s, 3301914493), _fnv(s + '~', 63245986)]
+    .map(x => x.toString(16).padStart(8, '0')).join('');
+}
+async function pwdHash(pwd, salt){
+  const raw = salt + '|' + pwd + '|ctm2026';
+  try{
+    if(window.crypto && crypto.subtle && crypto.subtle.digest && window.TextEncoder){
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+      return 'S' + Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+  }catch(e){}
+  return 'W' + _weak(raw);
+}
+const mkSalt = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const uid2 = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const findUser = name => users.find(u => u.name.toLowerCase() === String(name).trim().toLowerCase());
+
+function seed(){
+  return {
+    version:1,
+    categories:[
+      {id:'c1', name:'名山', icon:'⛰️', color:'#2e7d32', shape:'mountain', desc:'以山岳自然与人文景观为主'},
+      {id:'c2', name:'名河', icon:'🌊', color:'#1565c0', shape:'wave',     desc:'江河峡谷、瀑布水系景观'},
+      {id:'c3', name:'古桥', icon:'🌉', color:'#8d6e63', shape:'bridge',   desc:'古代桥梁建筑遗产'},
+      {id:'c4', name:'古镇', icon:'🏘️', color:'#e08a00', shape:'house',    desc:'历史街镇与古城聚落'},
+      {id:'c5', name:'园林', icon:'🏞️', color:'#7b1fa2', shape:'tree',     desc:'古典园林与皇家苑囿'},
+      {id:'c6', name:'名楼', icon:'🏯', color:'#c62828', shape:'tower',    desc:'千古名楼阁'}
+    ],
+    spots:[
+      {id:'s1',cat:'c1',name:'泰山',addr:'山东省泰安市岱岳区',lat:36.2544,lng:117.1011,tags:'五岳之首 · 世界文化与自然双遗产',desc:'泰山位于山东省泰安市，素有“五岳之首”“天下第一山”之称，1987年成为中国首个世界文化与自然双重遗产。\n主峰玉皇顶海拔1545米，历代帝王封禅、文人题咏留下的碑刻石刻遍布山道。\n经典线路：红门—中天门—十八盘—南天门—玉皇顶，徒步约5—7小时；想看日出可夜爬或乘索道至南天门住宿。'},
+      {id:'s2',cat:'c1',name:'黄山',addr:'安徽省黄山市黄山区',lat:30.1333,lng:118.1667,tags:'奇松怪石云海温泉 · 世界双遗产',desc:'黄山以“奇松、怪石、云海、温泉、冬雪”五绝闻名，主峰莲花峰海拔1864米。\n代表性景点有迎客松、光明顶、飞来石、西海大峡谷与排云亭。\n建议安排两天：前山慈光阁上行，后山云谷寺下行，山上住一晚看日出云海概率最高。'},
+      {id:'s3',cat:'c1',name:'华山',addr:'陕西省渭南市华阴市',lat:34.4772,lng:110.0870,tags:'奇险天下第一山',desc:'华山位于陕西华阴，南峰海拔2154.9米，以“长空栈道”“鹞子翻身”等险道著称。\n东峰观日出、西峰看绝壁、南峰为最高峰，北峰相对平缓。\n体力一般者可走“西峰索道上、北峰索道下”的经典省力线路，全程约6—8小时。'},
+      {id:'s4',cat:'c1',name:'峨眉山',addr:'四川省乐山市峨眉山市',lat:29.5186,lng:103.3336,tags:'佛教四大名山 · 金顶云海',desc:'峨眉山是普贤菩萨道场，主峰万佛顶海拔3099米，山势起伏、植被垂直带谱完整。\n金顶可观云海、日出、佛光与四面十方普贤金像，报国寺、万年寺、清音阁为主要寺院。\n山猴出没频繁，注意收好随身物品；金顶海拔高、温差大，需备厚外套。'},
+      {id:'s5',cat:'c1',name:'庐山',addr:'江西省九江市庐山市',lat:29.5520,lng:115.9770,tags:'避暑胜地 · 世界文化遗产',desc:'庐山位于江西九江，主峰汉阳峰海拔1474米，以雄、奇、险、秀闻名，是著名避暑与疗养胜地。\n核心看点：含鄱口观鄱阳湖日出、三叠泉瀑布、五老峰、花径与美庐别墅群。\n山上牯岭镇为集散中心，四季景色各异，夏季凉爽、冬季可赏雾凇雪景。'},
+      {id:'s6',cat:'c1',name:'武夷山',addr:'福建省南平市武夷山市',lat:27.6717,lng:117.6736,tags:'丹霞地貌 · 世界双遗产',desc:'武夷山以丹霞地貌与九曲溪竹筏漂流著称，主峰黄岗山海拔2160.8米。\n必游：天游峰、九曲溪漂流、大红袍景区、下梅古民居。\n这里是乌龙茶与红茶（正山小种）发源地，可结合茶村体验安排2—3天行程。'},
+
+      {id:'s7',cat:'c2',name:'长江三峡',addr:'湖北省宜昌市三峡大坝—西陵峡',lat:30.8230,lng:111.0050,tags:'瞿塘雄 · 巫峡秀 · 西陵险',desc:'长江三峡由瞿塘峡、巫峡、西陵峡组成，西起重庆奉节白帝城，东至湖北宜昌南津关，全长约193公里。\n三峡大坝、葛洲坝与西陵峡口构成现代工程与峡谷风光的组合景观。\n常见玩法：宜昌或重庆登船，顺江而下3—4天；也可在宜昌乘船游西陵峡一日往返。'},
+      {id:'s8',cat:'c2',name:'壶口瀑布',addr:'山西省临汾市吉县 / 陕西省延安市宜川县',lat:36.1470,lng:110.4440,tags:'黄河第一大瀑布',desc:'壶口瀑布是黄河干流上唯一的特大瀑布，河水由300余米宽骤然收束至30米左右，跌入深槽，声如雷鸣。\n山西侧（吉县）与陕西侧（宜川）均可观赏，视角各有不同。\n每年4—5月桃花汛与9—11月秋汛水量最大，气势最壮观；冬季形成冰瀑奇观。'},
+      {id:'s9',cat:'c2',name:'漓江',addr:'广西壮族自治区桂林市阳朔县',lat:25.0500,lng:110.3100,tags:'桂林山水甲天下',desc:'漓江自桂林磨盘山码头至阳朔约83公里，两岸喀斯特峰林连绵，是桂林山水的精华段落。\n经典游法：桂林—阳朔竹筏或游船漂流，途中经九马画山、黄布倒影（20元人民币背景）。\n抵达阳朔后可衔接十里画廊、遇龙河漂流与西街夜游，安排2天为宜。'},
+      {id:'s10',cat:'c2',name:'雅鲁藏布大峡谷',addr:'西藏自治区林芝市米林县',lat:29.4700,lng:95.0500,tags:'世界最深峡谷',desc:'雅鲁藏布大峡谷绕行南迦巴瓦峰作马蹄形大拐弯，全长约504.6公里，最深处超6000米，为世界最深峡谷。\n河谷从高山冰雪带到低河谷热带季雨林带，垂直自然带谱完整。\n最佳观景点为米林县派镇索松村、直白村，秋季（10—11月）南迦巴瓦峰露面概率较高。'},
+      {id:'s11',cat:'c2',name:'钱塘江潮',addr:'浙江省嘉兴市海宁市盐官镇',lat:30.4000,lng:120.5600,tags:'天下第一潮',desc:'钱塘江涌潮因杭州湾喇叭口地形而形成，海宁盐官为最著名的观潮点，可见“一线潮”“交叉潮”“回头潮”。\n农历八月十八前后潮势最大，全年每月农历初一至初五、十五至二十也有可观潮讯。\n观潮务必站在指定安全区域内，听从现场管理，切勿下堤拍照。'},
+      {id:'s12',cat:'c2',name:'京杭大运河',addr:'浙江省杭州市拱墅区拱宸桥',lat:30.3200,lng:120.1380,tags:'世界文化遗产 · 中国大运河',desc:'京杭大运河北起北京、南至杭州，全长约1794公里，是世界上开凿最早、里程最长的人工运河。\n杭州拱宸桥段是运河南端的标志，周边有桥西历史街区、刀剪剑博物馆等。\n沿线可分段游览：杭州、扬州、淮安、济宁、天津等段各有不同风貌的水工遗存与老街。'},
+
+      {id:'s13',cat:'c3',name:'赵州桥',addr:'河北省石家庄市赵县',lat:37.7350,lng:114.7840,tags:'世界最早敞肩石拱桥',desc:'赵州桥（安济桥）由隋代匠师李春建于公元595—605年，净跨37.02米，是世界上现存最早、保存最完整的敞肩石拱桥。\n其“敞肩拱”结构既减轻桥身自重又利于泄洪，比欧洲同类桥早出现约700年。\n现与永通桥、柏林禅寺同属赵县一日游线路，距石家庄市区约45公里。'},
+      {id:'s14',cat:'c3',name:'卢沟桥',addr:'北京市丰台区宛平城',lat:39.8490,lng:116.2120,tags:'七七事变发生地',desc:'卢沟桥始建于金大定二十九年（1189年），是北京现存最古老的石造联拱桥，全长266.5米。\n桥上石狮形态各异、数量众多，民间有“卢沟桥的狮子数不清”之说；“卢沟晓月”为燕京八景之一。\n1937年7月7日在此爆发“七七事变”，桥东的宛平城与中国人民抗日战争纪念馆可一并参观。'},
+      {id:'s15',cat:'c3',name:'洛阳桥',addr:'福建省泉州市洛江区',lat:24.8700,lng:118.6600,tags:'海丝名桥 · 筏形基础',desc:'洛阳桥由北宋蔡襄主持建造（1053—1059年），是中国现存最早的跨海梁式石桥。\n首创“筏形基础”“种蛎固基”法，以牡蛎胶结桥墩石块，在世界桥梁史上地位独特。\n桥长约731米，与安平桥、泉州古城同属“泉州：宋元中国的世界海洋商贸中心”遗产体系。'},
+      {id:'s16',cat:'c3',name:'安平桥',addr:'福建省泉州市晋江市安海镇',lat:24.7120,lng:118.4360,tags:'天下无桥长此桥',desc:'安平桥俗称五里桥，建于南宋绍兴八年（1138年），全长约2255米，是中国现存最长的古代石梁桥。\n桥面由巨型石板铺就，桥墩呈船形以分水势，中亭附近有历代修桥碑记。\n建议傍晚时分漫步，可结合安海古镇、草庵摩尼光佛造像安排半日行程。'},
+      {id:'s17',cat:'c3',name:'广济桥',addr:'广东省潮州市湘桥区',lat:23.6600,lng:116.6300,tags:'启闭式浮梁结合桥',desc:'广济桥俗称湘子桥，始建于南宋乾道七年（1171年），全长518米，集梁桥、浮桥、拱桥于一体。\n中段十八梭船每日定时开合，形成“十八梭船廿四洲”的独特格局，被誉为世界上最早的启闭式桥梁。\n与潮州古城、牌坊街、韩文公祠相连，夜游灯光秀尤为热门。'},
+      {id:'s18',cat:'c3',name:'程阳风雨桥',addr:'广西壮族自治区柳州市三江侗族自治县',lat:25.8830,lng:109.5800,tags:'侗族木构廊桥',desc:'程阳风雨桥（永济桥）建于1912年，是侗族地区规模最大的风雨桥，全长64.4米。\n全桥不用一钉一铆，以榫卯木构叠加而成，桥上建五座塔式桥亭，兼具通行、遮雨与集会功能。\n与程阳八寨侗族村寨相连，可体验侗族大歌、百家宴与侗锦织造。'},
+
+      {id:'s19',cat:'c4',name:'周庄',addr:'江苏省苏州市昆山市',lat:31.1140,lng:120.8490,tags:'中国第一水乡',desc:'周庄四面环水、井字形河道穿镇而过，保存着元明清石桥十四座，双桥（世德桥、永安桥）最为知名。\n主要看点：沈厅、张厅、富安桥、迷楼与南湖秋月园。\n建议清晨或傍晚进镇以避开旅行团高峰，可乘摇橹船听船歌，品尝万三蹄。'},
+      {id:'s20',cat:'c4',name:'乌镇',addr:'浙江省嘉兴市桐乡市',lat:30.7440,lng:120.4890,tags:'枕水人家 · 世界互联网大会永久举办地',desc:'乌镇分为东栅与西栅，西栅由景区整体统一运营，夜景灯光与水巷夜船最具代表性。\n看点包括昭明书院、草木本色染坊、桥里桥、水剧场，以及木雕馆、三寸金莲馆等专题展馆。\n每年举办乌镇戏剧节（10月前后），黄磊、赖声川等发起，一票难求。'},
+      {id:'s21',cat:'c4',name:'西塘',addr:'浙江省嘉兴市嘉善县',lat:30.9420,lng:120.8830,tags:'生活着的千年古镇',desc:'西塘以长达1300多米的“烟雨长廊”著称，沿河廊棚可遮阳避雨，是最具生活气息的江南水乡之一。\n古镇内保存大量明清民居与122条深巷，石皮弄最窄处不足1米。\n清晨与夜晚免票时段进入体验更佳，可结合汉服拍摄与“送子来凤桥”打卡。'},
+      {id:'s22',cat:'c4',name:'同里',addr:'江苏省苏州市吴江区',lat:31.1580,lng:120.7060,tags:'退思园 · 世界文化遗产',desc:'同里被十五条小河分为七个小岛，由四十九座古桥相连，有水乡“小桥流水人家”典型格局。\n核心景点退思园是世界文化遗产（苏州古典园林扩展项目），贴水而建、布局紧凑。\n镇内还有嘉荫堂、崇本堂、三桥（太平、吉利、长庆）走桥民俗。'},
+      {id:'s23',cat:'c4',name:'丽江古城',addr:'云南省丽江市古城区',lat:26.8720,lng:100.2290,tags:'世界文化遗产 · 纳西古城',desc:'丽江古城始建于宋末元初，是中国罕见的没有城墙的古城，依水而建、街巷随地形自由伸展。\n以四方街为中心，木府、万古楼、黑龙潭与纳西东巴文化为主要看点。\n海拔约2400米，注意防晒与保暖；可衔接玉龙雪山、束河古镇、拉市海安排3—4天。'},
+      {id:'s24',cat:'c5',name:'平遥古城',addr:'山西省晋中市平遥县',lat:37.2010,lng:112.1750,tags:'保存最完整的明清县城',desc:'平遥古城始建于西周，现存城墙为明洪武三年（1370年）扩建，周长约6.4公里，是中国汉民族地区保存最完整的明清县城。\n城内日昇昌票号、县衙、文庙、城墙与明清街构成完整的历史城市标本。\n每年9月举办平遥国际摄影大展，可购买通票（含22个景点）一次游览。'},
+      {id:'s25',cat:'c4',name:'凤凰古城',addr:'湖南省湘西土家族苗族自治州凤凰县',lat:27.9490,lng:109.5990,tags:'沱江吊脚楼 · 湘西风情',desc:'凤凰古城依沱江而建，两岸吊脚楼连绵，虹桥、跳岩、东门城楼构成经典画面。\n这里是文学家沈从文的故乡，可从沈从文故居、熊希龄故居了解湘西人文。\n清晨薄雾与夜晚灯影最有味道；周边可延伸至南方长城、奇梁洞与苗寨。'},
+
+      {id:'s26',cat:'c5',name:'拙政园',addr:'江苏省苏州市姑苏区东北街178号',lat:31.3240,lng:120.6290,tags:'江南园林之首 · 世界文化遗产',desc:'拙政园始建于明正德四年（1509年），占地面积约5.2万平方米，是苏州现存最大的古典园林，与留园、网师园、环秀山庄共同列入世界文化遗产。\n全园以水为中心，分东、中、西三部分：中部远香堂、小飞虹一带为精华，西部补园有三十六鸳鸯馆与波形廊。\n游览建议：开门即入，按东—中—西顺序慢行约1.5—2小时，春季杜鹃、夏季荷花、秋有红枫。'},
+      {id:'s27',cat:'c5',name:'留园',addr:'江苏省苏州市姑苏区留园路338号',lat:31.3180,lng:120.6070,tags:'四大名园之一 · 空间序列典范',desc:'留园始建于明万历年间，占地约2.33万平方米，以建筑空间处理手法高超著称。\n入口狭长曲折、豁然开朗，形成“抑—扬”对比；中部山水、东部厅堂（五峰仙馆、林泉耆硕之馆）、北部田园、西部山林各具风貌。\n园中冠云峰为著名太湖石孤品，是拍照打卡必看。'},
+      {id:'s28',cat:'c5',name:'颐和园',addr:'北京市海淀区新建宫门路19号',lat:39.9990,lng:116.2750,tags:'皇家园林博物馆 · 世界文化遗产',desc:'颐和园原名清漪园，始建于清乾隆年间，占地约2.9平方公里，以昆明湖与万寿山为骨架。\n核心景观：长廊（728米）、佛香阁、排云殿、十七孔桥、石舫与苏州街。\n建议由东宫门入、北宫门出，全程约3小时；冬季昆明湖结冰可体验冰场。'},
+      {id:'s29',cat:'c5',name:'承德避暑山庄',addr:'河北省承德市双桥区',lat:40.9960,lng:117.9380,tags:'中国现存最大皇家园林',desc:'避暑山庄始建于清康熙四十二年（1703年），历时89年建成，占地约564万平方米，是中国现存规模最大的皇家园林。\n分宫殿区、湖泊区、平原区与山峦区，兼具南北园林风格与塞外山川气象。\n周边外八庙（普宁寺、普陀宗乘之庙等）为世界文化遗产，建议山庄一日、外八庙一日。'},
+      {id:'s30',cat:'c5',name:'个园',addr:'江苏省扬州市广陵区盐阜东路10号',lat:32.3960,lng:119.7860,tags:'四季假山 · 盐商宅园',desc:'个园为清代两淮盐商黄至筠的私家园林，以遍植修竹与“四季假山”闻名。\n春山用石笋配竹、夏山以太湖石叠云、秋山用黄石、冬山以宣石（雪石）营造雪意，一园之内循环四季。\n与何园、东关街、瘦西湖串联，可作为扬州一日游的经典线路。'},
+
+      {id:'s31',cat:'c6',name:'黄鹤楼',addr:'湖北省武汉市武昌区蛇山西山坡特1号',lat:30.5430,lng:114.3050,tags:'天下江山第一楼',desc:'黄鹤楼始建于三国东吴黄武二年（223年），屡毁屡建，现楼为1985年重建，高51.4米。\n因崔颢《黄鹤楼》、李白“黄鹤楼中吹玉笛”等诗篇而名动天下，登楼可俯瞰长江与武汉三镇。\n与蛇山、长江大桥、户部巷串联安排半日最为顺路，夜游灯光秀值得一看。'},
+      {id:'s32',cat:'c6',name:'岳阳楼',addr:'湖南省岳阳市岳阳楼区洞庭北路',lat:29.3760,lng:113.0920,tags:'洞庭天下水 · 岳阳天下楼',desc:'岳阳楼始建年代可追溯至东汉，现存主楼为清光绪六年（1880年）重建，是江南三大名楼中唯一保持原构的古建筑。\n范仲淹《岳阳楼记》“先天下之忧而忧，后天下之乐而乐”使其名扬千古。\n楼前即洞庭湖与君山岛，可乘船登岛，品银鱼、君山银针茶。'},
+      {id:'s33',cat:'c6',name:'滕王阁',addr:'江西省南昌市东湖区仿古街58号',lat:28.6800,lng:115.8900,tags:'西江第一楼',desc:'滕王阁始建于唐永徽四年（653年），因王勃《滕王阁序》“落霞与孤鹜齐飞，秋水共长天一色”而名垂千古。\n现存建筑为1989年重建，主体高57.5米，为仿宋式钢筋混凝土结构。\n登阁可远眺赣江与南昌新城，夜间《寻梦滕王阁》实景演出可一并安排。'},
+      {id:'s34',cat:'c6',name:'鹳雀楼',addr:'山西省运城市永济市蒲州古城',lat:34.8500,lng:110.2900,tags:'白日依山尽',desc:'鹳雀楼因王之涣《登鹳雀楼》“白日依山尽，黄河入海流”而家喻户晓，原楼毁于元初战火。\n现楼为2002年在黄河岸畔蒲州古城西侧重建，高73.9米，为仿唐形制。\n与普救寺（《西厢记》故事发生地）、黄河大铁牛、蒲津渡遗址构成永济一日游线路。'},
+      {id:'s35',cat:'c6',name:'蓬莱阁',addr:'山东省烟台市蓬莱区迎宾路7号',lat:37.8200,lng:120.7600,tags:'人间仙境 · 海市蜃楼',desc:'蓬莱阁始建于北宋嘉祐六年（1061年），与黄鹤楼、岳阳楼、滕王阁并称中国古代四大名楼。\n建筑群依丹崖山而建，含天后宫、龙王宫、吕祖殿、弥陀寺等，是“八仙过海”传说的发源地。\n天气条件适宜时有机会观测到海市蜃楼，周边可衔接戚继光故里、三仙山与长岛。'}
+    ]
+  };
+}
+
+let data = load();
+(function migrate(){
+  let changed = false;
+  data.categories.forEach(c => { if(!c.shape){ c.shape = guessShape(c.name); changed = true; } });
+  if(changed) save();
+})();
+let activeCats = null;            // null=全部；否则为 id 集合
+let multiMode = false;
+let currentSpotId = null;
+let editingCat = null, editingSpot = null;
+let picking = false;   // 是否在地图上取点
+
+function showSpErr(msg){
+  const e = document.getElementById('spErr');
+  if(!e) return;
+  e.className = 'sp-err';
+  e.textContent = '⚠ ' + msg;
+}
+function showSpOk(msg){
+  const e = document.getElementById('spErr');
+  if(!e) return;
+  e.className = 'sp-err';
+  e.style.color = '#0f7b8a'; e.style.background = '#e6f4f6'; e.style.borderColor = '#bfe3e8';
+  e.textContent = '✓ ' + msg;
+}
+
+function load(){
+  const key = dataKey();
+  try{
+    const raw = localStorage.getItem(key);
+    if(raw){
+      const d = JSON.parse(raw);
+      if(d && Array.isArray(d.categories) && Array.isArray(d.spots)) return d;
+    }
+  }catch(e){}
+  // 新账号首次登录：若携带开关打开，则继承游客数据
+  const d = (currentUser && currentUser.__carry) ? loadGuest() : seed();
+  try{ localStorage.setItem(key, JSON.stringify(d)); }catch(e){}
+  return d;
+}
+function loadGuest(){
+  try{
+    const raw = localStorage.getItem(STORE);
+    if(raw){
+      const d = JSON.parse(raw);
+      if(d && Array.isArray(d.categories) && Array.isArray(d.spots)) return JSON.parse(JSON.stringify(d));
+    }
+  }catch(e){}
+  return seed();
+}
+function save(){
+  try{ localStorage.setItem(dataKey(), JSON.stringify(data)); }
+  catch(e){ toast('本地保存失败：' + e.message); }
+}
+
+/* ---- 本地备份点（代替云端：可一键回滚最近 8 次） ---- */
+function pushSnapshot(label){
+  const arr = lsGet(snapKey(), []);
+  arr.unshift({ t: Date.now(), label: label || '自动备份', data: JSON.parse(JSON.stringify(data)) });
+  lsSet(snapKey(), arr.slice(0, 8));
+}
+function renderSnapshots(){
+  const box = document.getElementById('snapList');
+  if(!box) return;
+  const arr = lsGet(snapKey(), []);
+  if(!arr.length){ box.innerHTML = '<div class="tip">还没有备份点，点上方「创建备份点」保存一份当前数据。</div>'; return; }
+  box.innerHTML = arr.map((s, i) =>
+    '<div class="snap"><div class="st">' + esc(s.label)
+    + '<small>' + new Date(s.t).toLocaleString('zh-CN') + ' · ' + (s.data.spots || []).length + ' 个景点</small></div>'
+    + '<button class="btn sm" data-snap="' + i + '">恢复</button></div>').join('');
+  box.querySelectorAll('button[data-snap]').forEach(b => b.onclick = () => {
+    const s = arr[+b.dataset.snap];
+    if(!s) return;
+    if(!confirm('恢复到该备份点？当前数据将被覆盖（' + s.data.spots.length + ' 个景点）。')) return;
+    data = JSON.parse(JSON.stringify(s.data));
+    activeCats = null; currentSpotId = null;
+    save(); renderAll(); if(mapReady) fitView();
+    toast('已恢复备份点'); renderAuth();
+  });
+}
+const uid = p => p + Math.random().toString(36).slice(2,9);
+const catOf = id => data.categories.find(c => c.id === id);
+const spotOf = id => data.spots.find(s => s.id === id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ============ 地图 ============ */
+let map, markerLayer, infoWin, searchSvc, geoSvc, mapReady = false;
+
+/* ---- 底图：标准矢量 / 卫星影像 / 地形晕渲（天地图）---- */
+const TK_STORE = 'tdt_tk_v1';
+let tdtTk = ''; try{ tdtTk = localStorage.getItem(TK_STORE) || ''; }catch(e){}
+let baseMode = 'terrain';           // 默认地形图
+let terrainLayer = null, terrainLabel = null;
+
+/* GCJ-02（腾讯/高德）与 WGS-84（天地图 CGCS2000）互转 */
+const _PI = Math.PI, _A = 6378245.0, _EE = 0.00669342162296594323;
+function _tLat(x, y){
+  let r = -100 + 2*x + 3*y + 0.2*y*y + 0.1*x*y + 0.2*Math.sqrt(Math.abs(x));
+  r += (20*Math.sin(6*x*_PI) + 20*Math.sin(2*x*_PI)) * 2/3;
+  r += (20*Math.sin(y*_PI) + 40*Math.sin(y/3*_PI)) * 2/3;
+  r += (160*Math.sin(y/12*_PI) + 320*Math.sin(y*_PI/30)) * 2/3;
+  return r;
+}
+function _tLng(x, y){
+  let r = 300 + x + 2*y + 0.1*x*x + 0.1*x*y + 0.1*Math.sqrt(Math.abs(x));
+  r += (20*Math.sin(6*x*_PI) + 20*Math.sin(2*x*_PI)) * 2/3;
+  r += (20*Math.sin(x*_PI) + 40*Math.sin(x/3*_PI)) * 2/3;
+  r += (150*Math.sin(x/12*_PI) + 300*Math.sin(x/30*_PI)) * 2/3;
+  return r;
+}
+function wgs2gcj(lng, lat){
+  let dLat = _tLat(lng - 105, lat - 35), dLng = _tLng(lng - 105, lat - 35);
+  const rLat = lat / 180 * _PI;
+  let m = Math.sin(rLat); m = 1 - _EE * m * m;
+  const sm = Math.sqrt(m);
+  dLat = (dLat * 180) / ((_A * (1 - _EE)) / (m * sm) * _PI);
+  dLng = (dLng * 180) / (_A / sm * Math.cos(rLat) * _PI);
+  return { lng: lng + dLng, lat: lat + dLat };
+}
+function gcj2wgs(lng, lat){
+  let wlng = lng, wlat = lat;
+  for(let i = 0; i < 6; i++){
+    const g = wgs2gcj(wlng, wlat);
+    wlng += (lng - g.lng); wlat += (lat - g.lat);
+  }
+  return { lng: wlng, lat: wlat };
+}
+/* 统一取点：地形底图（天地图）用 WGS-84，其余用 GCJ-02 */
+function posOf(s){
+  const p = (baseMode === 'terrain' && tdtTk) ? gcj2wgs(s.lng, s.lat) : { lng: s.lng, lat: s.lat };
+  return new TMap.LatLng(p.lat, p.lng);
+}
+function tdtUrl(layer, x, y, z){
+  const s = Math.abs(x) % 8;
+  return 'https://t' + s + '.tianditu.gov.cn/' + layer + '_w/wmts?SERVICE=WMTS&REQUEST=GetTile'
+    + '&VERSION=1.0.0&LAYER=' + layer + '&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles'
+    + '&TILEMATRIX=' + z + '&TILEROW=' + y + '&TILECOL=' + x + '&tk=' + encodeURIComponent(tdtTk);
+}
+function buildTerrain(){
+  if(terrainLayer || !window.TMap || !TMap.ImageTileLayer) return;
+  try{
+    terrainLayer = new TMap.ImageTileLayer({
+      map: map, tileSize: 256, minZoom: 1, maxZoom: 18, zIndex: 1,
+      getTileUrl: (x, y, z) => tdtUrl('ter', x, y, z)
+    });
+    terrainLabel = new TMap.ImageTileLayer({
+      map: map, tileSize: 256, minZoom: 1, maxZoom: 18, zIndex: 2,
+      getTileUrl: (x, y, z) => tdtUrl('cta', x, y, z)
+    });
+  }catch(e){ console.warn('地形图层创建失败', e); }
+}
+function hideTerrain(){
+  [terrainLayer, terrainLabel].forEach(l => {
+    if(!l) return;
+    try{ if(l.setMap) l.setMap(null); else if(l.setVisible) l.setVisible(false); }catch(e){}
+  });
+}
+function applyBaseMap(mode){
+  baseMode = mode;
+  document.querySelectorAll('.bm').forEach(b => b.classList.toggle('on', b.dataset.bm === mode));
+  if(!mapReady){ return; }
+  const tip = document.getElementById('tkTip');
+  let real = mode;
+  if(mode === 'terrain' && !tdtTk){
+    real = 'satellite';                       // 未配置密钥时回退到卫星影像
+    tip.style.display = 'block';
+    toast('未配置天地图密钥，暂用卫星影像；点「地形图密钥」可启用地形图');
+  }else{
+    tip.style.display = 'none';
+  }
+  try{
+    if(real === 'terrain'){
+      map.setBaseMap({ type: 'vector', features: [] });   // 隐藏腾讯矢量底图
+      buildTerrain();
+      if(terrainLayer){ try{ terrainLayer.setMap(map); }catch(e){} }
+      if(terrainLabel){ try{ terrainLabel.setMap(map); }catch(e){} }
+    }else{
+      hideTerrain();
+      map.setBaseMap({ type: real });                      // vector / satellite
+    }
+  }catch(e){
+    console.warn('切换底图失败', e);
+    try{ map.setBaseMap({ type: 'vector' }); }catch(e2){}
+  }
+  renderMarkers();
+}
+
+/* ---- 图标样式：水滴图钉 + 分类图形 ---- */
+const SHAPES = [
+  { k:'pin',      n:'图钉' },
+  { k:'mountain', n:'山峰' },
+  { k:'wave',     n:'水波' },
+  { k:'bridge',   n:'古桥' },
+  { k:'house',    n:'屋舍' },
+  { k:'tree',     n:'树木' },
+  { k:'tower',    n:'楼塔' },
+  { k:'star',     n:'星形' },
+  { k:'flag',     n:'旗帜' },
+  { k:'circle',   n:'圆点' },
+  { k:'diamond',  n:'菱形' },
+  { k:'heart',    n:'心形' }
+];
+function glyphSVG(shape, c){
+  switch(shape){
+    case 'mountain':
+      return '<path d="M11.2 20.4 L16.8 11.2 L22.4 20.4 Z" fill="'+c+'"/>'
+           + '<path d="M14.3 17.2 h5" stroke="#fff" stroke-width="1.2"/>';
+    case 'wave':
+      return '<path d="M11.5 15.9 q2.6-3.2 5.2 0 t5.2 0" fill="none" stroke="'+c+'" stroke-width="2"/>'
+           + '<path d="M11.5 19.6 q2.6-3.2 5.2 0 t5.2 0" fill="none" stroke="'+c+'" stroke-width="1.6" opacity=".55"/>';
+    case 'bridge':
+      return '<path d="M10.6 15.6 h12.8" stroke="'+c+'" stroke-width="1.7"/>'
+           + '<path d="M12.2 19.8 A4.2 4.2 0 0 1 21.8 19.8 Z" fill="'+c+'"/>'
+           + '<path d="M15.3 19.8 A1.4 1.4 0 0 1 18.7 19.8 Z" fill="#ffffff"/>'
+           + '<path d="M13.7 16.5 v3.2 M20.3 16.5 v3.2" stroke="'+c+'" stroke-width="1.2"/>';
+    case 'house':
+      return '<path d="M11.6 19.8 V13.2 L17 9.4 L22.4 13.2 v6.6 Z" fill="'+c+'"/>'
+           + '<path d="M15.2 19.8 v-4 h3.6 v4 Z" fill="#fff"/>';
+    case 'tree':
+      return '<ellipse cx="17" cy="12.9" rx="5.3" ry="4.7" fill="'+c+'"/>'
+           + '<path d="M16 16.4 h2 v4.6 h-2 Z" fill="'+c+'"/>';
+    case 'tower':
+      return '<path d="M11.6 10.4 L17 7.8 L22.4 10.4 Z" fill="'+c+'"/>'
+           + '<path d="M13.6 12.2 h6.8 v2.6 h-6.8 Z" fill="'+c+'"/>'
+           + '<path d="M12.8 15.8 h8.4 v2.6 h-8.4 Z" fill="'+c+'"/>'
+           + '<path d="M14 19.2 h6 v1.9 h-6 Z" fill="'+c+'"/>';
+    case 'star':
+      return '<path d="M17 10.2 l1.9 4.1 4.5.5 -3.3 3.1.8 4.5L17 20.1l-3.9 2.3.8-4.5-3.3-3.1 4.5-.5Z" fill="'+c+'"/>';
+    case 'flag':
+      return '<path d="M13.2 20.8 V9.6" stroke="'+c+'" stroke-width="1.8"/>'
+           + '<path d="M13.2 10.2 h7.6 l-1.8 2.8 1.8 2.8 h-7.6 Z" fill="'+c+'"/>';
+    case 'circle':
+      return '<circle cx="17" cy="15.6" r="5.2" fill="'+c+'"/>';
+    case 'diamond':
+      return '<path d="M17 10.4 L22.4 15.6 L17 20.8 L11.6 15.6 Z" fill="'+c+'"/>';
+    case 'heart':
+      return '<path d="M17 20.6l-1.1-1c-2.7-3-4.1-5-4.1-6.7 0-1.7 1.3-2.9 2.9-2.9 1 0 1.9.5 2.3 1.2.4-.7 1.3-1.2 2.3-1.2 1.6 0 2.9 1.2 2.9 2.9 0 1.7-1.4 3.7-4.1 6.7z" fill="'+c+'"/>';
+    default:
+      return '<circle cx="17" cy="15.6" r="3" fill="'+c+'"/>';
+  }
+}
+function markerSVG(color, shape, big){
+  const w = big ? 46 : 34, h = big ? 58 : 43;
+  const inner = (shape && shape !== 'pin')
+    ? '<circle cx="17" cy="15.6" r="7" fill="#ffffff"/>' + glyphSVG(shape, color)
+    : '<circle cx="17" cy="15.6" r="6.6" fill="#ffffff"/><circle cx="17" cy="15.6" r="3.1" fill="'+color+'"/>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 34 43">'
+    + '<path d="M17 0.8C8.4 0.8 1.4 7.8 1.4 16.4c0 11.2 15.6 25.8 15.6 25.8S32.6 27.6 32.6 16.4C32.6 7.8 25.6 0.8 17 0.8z" '
+    + 'fill="'+color+'" stroke="#ffffff" stroke-width="1.6"/>' + inner + '</svg>';
+}
+/* 内联预览（DOM 用）与地图图钉（data URI 用） */
+function iconHTML(c, size){
+  size = size || 22;
+  return '<svg viewBox="0 0 34 43" width="' + Math.round(size * 34 / 43) + '" height="' + size + '">'
+    + markerSVG(c.color, c.shape || 'pin', false).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')
+    + '</svg>';
+}
+function markerSrc(c, big){
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markerSVG(c.color, c.shape || 'pin', big));
+}
+
+function initMap(){
+  map = new TMap.Map(document.getElementById('map'), {
+    center: new TMap.LatLng(35.0, 104.5),
+    zoom: 4.4,
+    pitch: 0,
+    rotation: 0,
+    showControl: true
+  });
+  markerLayer = new TMap.MultiMarker({ map: map, styles: {}, geometries: [] });
+  let lastMarkerClick = 0;
+  markerLayer.on('click', e => {
+    lastMarkerClick = Date.now();
+    if(e && e.geometry) openSpot(e.geometry.id, false);
+  });
+  infoWin = new TMap.InfoWindow({ map: map, position: map.getCenter(), content: '', offset: {x:0, y:-40}, enableCustom: true });
+  infoWin.close();
+  map.on('click', evt => {
+    if(picking){
+      const ll = evt && evt.latLng;
+      if(ll){
+        const p = (baseMode === 'terrain' && tdtTk)
+          ? wgs2gcj(ll.getLng(), ll.getLat())
+          : { lng: ll.getLng(), lat: ll.getLat() };
+        document.getElementById('spLat').value = p.lat.toFixed(6);
+        document.getElementById('spLng').value = p.lng.toFixed(6);
+        document.getElementById('spotMask').classList.remove('hidden');
+        const err = document.getElementById('spErr');
+        err.classList.remove('hidden');
+        err.style.color = '#0f7b8a'; err.style.background = '#e6f4f6'; err.style.borderColor = '#bfe3e8';
+        err.textContent = '已取点：' + p.lat.toFixed(4) + ', ' + p.lng.toFixed(4) + '（可直接保存）';
+        picking = false;
+      }
+      return;
+    }
+    if(Date.now() - lastMarkerClick < 400) return;
+    infoWin.close();
+  });
+  try{ geoSvc = new TMap.service.Geocoder(); }catch(e){}
+  try{ searchSvc = new TMap.service.Search({ pageSize: 8 }); }catch(e){}
+  mapReady = true;
+  applyBaseMap(baseMode);
+  renderAll();
+}
+
+function visibleSpots(){
+  let list = data.spots.filter(s => {
+    const c = catOf(s.cat);
+    if(!c) return false;
+    if(!activeCats) return true;
+    return activeCats.has(s.cat);
+  });
+  const kw = (document.getElementById('spotSearch').value || '').trim().toLowerCase();
+  if(kw){
+    list = list.filter(s => (s.name + ' ' + (s.addr||'') + ' ' + (s.desc||'') + ' ' + (s.tags||'')).toLowerCase().includes(kw));
+  }
+  return list;
+}
+
+function renderMarkers(){
+  if(!mapReady) return;
+  const list = visibleSpots();
+  const styles = {};
+  data.categories.forEach(c => {
+    styles['cat_' + c.id] = new TMap.MarkerStyle({ width:34, height:43, anchor:{x:17, y:43}, src: markerSrc(c, false) });
+  });
+  styles['_active'] = new TMap.MarkerStyle({ width:46, height:58, anchor:{x:23, y:58}, src: markerSrc({color:'#111827', shape:'pin'}, true) });
+  markerLayer.setStyles(styles);
+  markerLayer.setGeometries(list.map(s => ({
+    id: s.id,
+    styleId: s.id === currentSpotId ? '_active' : 'cat_' + s.cat,
+    position: posOf(s)
+  })));
+  renderLegend(list);
+}
+
+function renderLegend(list){
+  const box = document.getElementById('legend');
+  const counts = {};
+  list.forEach(s => counts[s.cat] = (counts[s.cat] || 0) + 1);
+  const rows = data.categories.filter(c => counts[c.id]).map(c =>
+    '<div class="lg-i">' + iconHTML(c, 18) + '<span>' + esc(c.name) + '（' + counts[c.id] + '）</span></div>').join('');
+  box.innerHTML = '<div class="lg-t">当前显示 ' + list.length + ' 个点位</div>' + (rows || '<div style="color:#6b7280">暂无点位</div>');
+}
+
+/* ============ 列表渲染 ============ */
+function renderCats(){
+  const box = document.getElementById('catList');
+  const counts = {};
+  data.spots.forEach(s => counts[s.cat] = (counts[s.cat] || 0) + 1);
+  let html = '<div class="cat-item' + (activeCats === null ? ' active' : '') + '" data-all="1">'
+    + '<span class="ic">🗂️</span>'
+    + '<span class="cname">全部类别</span><span class="cnt">' + data.spots.length + '</span></div>';
+  data.categories.forEach(c => {
+    const on = activeCats ? activeCats.has(c.id) : false;
+    html += '<div class="cat-item' + (on ? ' active' : '') + '" data-id="' + c.id + '">'
+      + (multiMode ? '<span class="check' + (on ? ' on' : '') + '">✓</span>' : '')
+      + '<span class="ic">' + iconHTML(c, 24) + '</span>'
+      + '<span class="cname">' + esc(c.name) + '</span>'
+      + '<span class="cnt">' + (counts[c.id] || 0) + '</span>'
+      + '<span class="ops">'
+      + '<button data-act="edit" title="编辑">✎</button>'
+      + '<button data-act="del" title="删除">✕</button>'
+      + '<button data-act="only" title="只看此类">◎</button>'
+      + '</span></div>';
+  });
+  box.innerHTML = html;
+}
+
+function renderList(){
+  const box = document.getElementById('spotList');
+  const list = visibleSpots();
+  document.getElementById('listCount').textContent = list.length + ' 个';
+  if(!list.length){ box.innerHTML = '<div class="empty">暂无景点，点右上「＋ 新景点」添加</div>'; return; }
+  box.innerHTML = list.map(s => {
+    const c = catOf(s.cat) || {name:'未分类', color:'#94a3b8', icon:'📍'};
+    return '<div class="spot-item' + (s.id === currentSpotId ? ' active' : '') + '" data-id="' + s.id + '">'
+      + '<div class="t"><span class="chip" style="background:' + c.color + '">' + esc(c.icon) + ' ' + esc(c.name) + '</span>'
+      + '<b>' + esc(s.name) + '</b></div>'
+      + (s.tags ? '<div class="addr">' + esc(s.tags) + '</div>' : '')
+      + (s.addr ? '<div class="addr">📍 ' + esc(s.addr) + '</div>' : '')
+      + '<div class="d">' + esc((s.desc || '').split('\n')[0]) + '</div>'
+      + '<div class="ops"><button class="btn sm" data-act="locate">定位</button>'
+      + '<button class="btn sm" data-act="edit">编辑</button>'
+      + '<button class="btn sm danger" data-act="del">删除</button></div>'
+      + '</div>';
+  }).join('');
+}
+
+function renderFilterSelect(){
+  const sel = document.getElementById('listFilter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="__all">全部类别</option>' + data.categories.map(c =>
+    '<option value="' + c.id + '">' + esc(c.icon) + ' ' + esc(c.name) + '</option>').join('');
+  if(activeCats && activeCats.size === 1){
+    sel.value = [...activeCats][0];
+  }else if(cur && (cur === '__all' || catOf(cur))){
+    sel.value = cur;
+  }
+}
+
+function renderStat(){
+  document.getElementById('stat').innerHTML =
+    '<b>' + data.categories.length + '</b> 个分类 · <b>' + data.spots.length + '</b> 个景点'
+    + ' · <b>' + (currentUser ? esc(currentUser.name) : '游客') + '</b>';
+  const b = document.getElementById('btnAccount');
+  if(b) renderAcctBtn();
+}
+
+function renderAll(){
+  renderStat(); renderCats(); renderFilterSelect(); renderList(); renderMarkers();
+}
+
+/* ============ 交互：打开/定位景点 ============ */
+function openSpot(id, fly){
+  const s = spotOf(id); if(!s) return;
+  currentSpotId = id;
+  if(!mapReady){ renderList(); openDrawer(id); return; }   // 地图没加载好也能看详情
+  const c = catOf(s.cat) || {name:'未分类', color:'#475569', icon:'📍'};
+  const ll = posOf(s);
+  if(fly !== false) map.easeTo({ center: ll, zoom: Math.max(map.getZoom(), 10) }, { duration: 500 });
+  const short = (s.desc || '').replace(/\n/g, ' ').slice(0, 120);
+  infoWin.setContent(
+    '<div class="iw"><div class="iw-hd" style="background:' + c.color + '">'
+    + iconHTML(c, 22) + '<b>' + esc(s.name) + '</b><span class="iw-close" id="iwClose">✕</span></div>'
+    + '<div class="iw-bd">'
+    + (s.tags ? '<div class="addr">' + esc(s.tags) + '</div>' : '')
+    + (s.addr ? '<div class="addr">📍 ' + esc(s.addr) + '</div>' : '')
+    + '<div class="d">' + esc(short) + (s.desc && s.desc.length > 120 ? '…' : '') + '</div></div>'
+    + '<div class="iw-ft"><button class="btn sm" id="iwMore">查看详情</button>'
+    + '<button class="btn sm" id="iwEdit">编辑</button></div></div>'
+  );
+  infoWin.setPosition(ll);
+  infoWin.open();
+  setTimeout(() => {
+    const close = document.getElementById('iwClose');
+    if(close) close.onclick = () => infoWin.close();
+    const more = document.getElementById('iwMore');
+    if(more) more.onclick = () => openDrawer(id);
+    const ed = document.getElementById('iwEdit');
+    if(ed) ed.onclick = () => openSpotModal(id);
+  }, 0);
+  renderList(); renderMarkers();
+}
+
+function openDrawer(id){
+  const s = spotOf(id); if(!s) return;
+  const c = catOf(s.cat) || {name:'未分类', color:'#475569', icon:'📍'};
+  const d = document.getElementById('drawer');
+  document.getElementById('dHead').style.background = c.color;
+  document.getElementById('dTitle').textContent = s.name;
+  document.getElementById('dMeta').textContent = c.icon + ' ' + c.name + (s.tags ? ' · ' + s.tags : '');
+  let body = '<div class="kv">📍 ' + esc(s.addr || '未提供地址') + '　|　坐标 ' + s.lat.toFixed(4) + ', ' + s.lng.toFixed(4) + '</div>';
+  if(s.img) body += '<img src="' + esc(s.img) + '" onerror="this.style.display=\'none\'" />';
+  body += (s.desc || '暂无详细介绍，点“编辑”补充。').split(/\n+/).map(p => '<p>' + esc(p) + '</p>').join('');
+  document.getElementById('dBody').innerHTML = body;
+  d.classList.add('open');
+  d.dataset.id = id;
+}
+
+function fitView(){
+  if(!mapReady) return;
+  const list = visibleSpots();
+  if(!list.length){ toast('当前没有可显示的点位'); return; }
+  if(list.length === 1){
+    map.easeTo({ center: posOf(list[0]), zoom: 11 }, { duration: 400 });
+    return;
+  }
+  const pts = list.map(s => posOf(s));
+  const lats = pts.map(p => p.getLat()), lngs = pts.map(p => p.getLng());
+  const sw = new TMap.LatLng(Math.min(...lats), Math.min(...lngs));
+  const ne = new TMap.LatLng(Math.max(...lats), Math.max(...lngs));
+  map.fitBounds(new TMap.LatLngBounds(sw, ne), { padding: 90, duration: 500 });
+}
+
+/* ============ 分类弹窗 ============ */
+let catColor = PALETTE[0];
+let catShape = 'pin';
+function openCatModal(id){
+  editingCat = id || null;
+  const c = id ? catOf(id) : null;
+  document.getElementById('catName').value = c ? c.name : '';
+  document.getElementById('catIcon').value = c ? c.icon : '📍';
+  document.getElementById('catDesc').value = c ? (c.desc || '') : '';
+  catColor = c ? c.color : PALETTE[data.categories.length % PALETTE.length];
+  catShape = (c && c.shape) || guessShape(c ? c.name : '');
+  const sw = document.getElementById('catSwatches');
+  sw.innerHTML = PALETTE.map(p => '<span data-c="' + p + '" class="' + (p === catColor ? 'on' : '') + '" style="background:' + p + '"></span>').join('');
+  sw.querySelectorAll('span').forEach(el => el.onclick = () => {
+    catColor = el.dataset.c;
+    sw.querySelectorAll('span').forEach(x => x.classList.toggle('on', x === el));
+    renderShapePicker();
+  });
+  renderShapePicker();
+  document.getElementById('catMask').classList.remove('hidden');
+}
+/* 按分类名猜一个合适的图标样式 */
+function guessShape(name){
+  const n = String(name || '');
+  if(/山|峰|岳|岭/.test(n)) return 'mountain';
+  if(/河|江|水|湖|溪|瀑|海|泉/.test(n)) return 'wave';
+  if(/桥/.test(n)) return 'bridge';
+  if(/镇|村|城|街|巷|寨/.test(n)) return 'house';
+  if(/园|林|花|草|竹/.test(n)) return 'tree';
+  if(/楼|阁|塔|寺|庙|殿|宫/.test(n)) return 'tower';
+  return 'pin';
+}
+function renderShapePicker(){
+  const box = document.getElementById('catShapes');
+  if(!box) return;
+  box.innerHTML = SHAPES.map(s =>
+    '<div class="shape' + (s.k === catShape ? ' on' : '') + '" data-k="' + s.k + '">'
+    + iconHTML({ color: catColor, shape: s.k }, 24) + '<span>' + s.n + '</span></div>').join('');
+  box.querySelectorAll('.shape').forEach(el => el.onclick = () => {
+    catShape = el.dataset.k;
+    box.querySelectorAll('.shape').forEach(x => x.classList.toggle('on', x === el));
+  });
+}
+document.getElementById('catSave').onclick = () => {
+  const name = document.getElementById('catName').value.trim();
+  if(!name){ toast('请填写分类名称'); return; }
+  const icon = document.getElementById('catIcon').value.trim() || '📍';
+  const desc = document.getElementById('catDesc').value.trim();
+  if(editingCat){
+    const c = catOf(editingCat); Object.assign(c, {name, icon, desc, color: catColor, shape: catShape});
+    toast('分类已更新');
+  }else{
+    data.categories.push({ id: uid('c'), name, icon, desc, color: catColor, shape: catShape });
+    toast('分类已创建，去添加景点吧');
+  }
+  save(); document.getElementById('catMask').classList.add('hidden'); renderAll();
+};
+document.getElementById('catCancel').onclick = () => document.getElementById('catMask').classList.add('hidden');
+
+/* ============ 景点弹窗 ============ */
+function openSpotModal(id){
+  editingSpot = id || null;
+  const s = id ? spotOf(id) : null;
+  document.getElementById('spotMaskTitle').textContent = s ? '编辑景点：' + s.name : '添加景点';
+  const sel = document.getElementById('spCat');
+  sel.innerHTML = data.categories.map(c => '<option value="' + c.id + '">' + esc(c.icon) + ' ' + esc(c.name) + '</option>').join('');
+  if(!data.categories.length){ toast('请先创建一个分类'); return; }
+  if(s){ sel.value = s.cat; }
+  else if(activeCats && activeCats.size === 1){ sel.value = [...activeCats][0]; }
+  document.getElementById('spName').value = s ? s.name : '';
+  document.getElementById('spAddr').value = s ? (s.addr || '') : '';
+  document.getElementById('spLat').value = s ? s.lat : '';
+  document.getElementById('spLng').value = s ? s.lng : '';
+  document.getElementById('spTags').value = s ? (s.tags || '') : '';
+  document.getElementById('spDesc').value = s ? (s.desc || '') : '';
+  document.getElementById('spImg').value = s ? (s.img || '') : '';
+  document.getElementById('geoCand').classList.add('hidden');
+  const err = document.getElementById('spErr');
+  err.className = 'sp-err hidden'; err.style.cssText = ''; err.textContent = '';
+  document.getElementById('spotMask').classList.remove('hidden');
+}
+document.getElementById('spCancel').onclick = () => document.getElementById('spotMask').classList.add('hidden');
+document.getElementById('spSave').onclick = async () => {
+  const name = document.getElementById('spName').value.trim();
+  if(!name){ showSpErr('请填写景点名称。'); return; }
+  if(!document.getElementById('spCat').value){
+    showSpErr('请先创建一个分类（左侧「＋ 新分类」），再录入景点。'); return;
+  }
+  let lat = parseFloat(document.getElementById('spLat').value);
+  let lng = parseFloat(document.getElementById('spLng').value);
+  if(isNaN(lat) || isNaN(lng)){
+    // 没填坐标：先尝试按名称自动定位，成功则直接落点
+    showSpOk('没有坐标，正在按名称自动定位…');
+    const addr0 = document.getElementById('spAddr').value.trim();
+    const cands = await doGeocode(name, addr0);
+    if(cands.length){
+      lat = cands[0].lat; lng = cands[0].lng;
+      document.getElementById('spLat').value = lat.toFixed(6);
+      document.getElementById('spLng').value = lng.toFixed(6);
+      if(!addr0 && cands[0].addr) document.getElementById('spAddr').value = cands[0].addr;
+    }else{
+      showSpErr('没能自动定位到坐标。请点「🔍 按名称自动定位」挑选，或点「📌 在地图上取点」，也可手工填写经纬度。');
+      return;
+    }
+  }
+  if(lat < 15 || lat > 55 || lng < 70 || lng > 140){
+    showSpErr('经纬度超出中国范围（纬度 15~55、经度 70~140），请修正。'); return;
+  }
+  const rec = {
+    cat: document.getElementById('spCat').value,
+    name,
+    addr: document.getElementById('spAddr').value.trim(),
+    lat, lng,
+    tags: document.getElementById('spTags').value.trim(),
+    desc: document.getElementById('spDesc').value.trim(),
+    img: document.getElementById('spImg').value.trim()
+  };
+  if(editingSpot){
+    Object.assign(spotOf(editingSpot), rec); toast('已更新');
+  }else{
+    const n = { id: uid('s'), ...rec }; data.spots.push(n); currentSpotId = n.id; toast('已添加到地图');
+  }
+  save();
+  document.getElementById('spotMask').classList.add('hidden');
+  renderAll();
+  if(!editingSpot){
+    const s = data.spots[data.spots.length - 1];
+    if(activeCats && !activeCats.has(s.cat)) activeCats = new Set([s.cat]);
+    renderAll(); fitView(); openSpot(s.id, true);
+  }
+};
+
+/* ---- 自动定位（腾讯位置服务：地址解析 + 地点检索） ---- */
+function pickLatLng(o){
+  if(o == null) return null;
+  if(typeof o.getLat === 'function') return { lat: o.getLat(), lng: o.getLng() };
+  if(typeof o.lat === 'number' && typeof o.lng === 'number') return { lat: o.lat, lng: o.lng };
+  if(typeof o.latitude === 'number' && typeof o.longitude === 'number') return { lat: o.latitude, lng: o.longitude };
+  return null;
+}
+async function doGeocode(name, addr){
+  const out = [];
+  const q = addr ? (addr.replace(/[省市自治区].*/, '') + name) : name;
+  try{
+    if(geoSvc){
+      const r = await geoSvc.getLocation({ address: q });
+      const p = pickLatLng(r && r.result && r.result.location);
+      if(p) out.push({ title: (r.result.title || name), addr: (r.result.address || addr || ''), ...p });
+    }
+  }catch(e){}
+  try{
+    if(searchSvc && typeof searchSvc.searchRegion === 'function'){
+      const m = String(addr || '').match(/^([\u4e00-\u9fa5]{2,5})(省|市|自治区)/);
+      const city = m ? m[1] : '';
+      const r = await searchSvc.searchRegion({ keyword: name, cityName: city });
+      ((r && r.data) || []).forEach(it => {
+        const p = pickLatLng(it.location);
+        if(p) out.push({ title: it.title || name, addr: it.address || '', ...p });
+      });
+    }
+  }catch(e){}
+  const uniq = [];
+  out.forEach(o => {
+    if(!uniq.some(u => Math.abs(u.lat - o.lat) < 0.001 && Math.abs(u.lng - o.lng) < 0.001)) uniq.push(o);
+  });
+  return uniq;
+}
+
+document.getElementById('btnGeo').onclick = async () => {
+  const box = document.getElementById('geoCand');
+  const name = document.getElementById('spName').value.trim();
+  const addr = document.getElementById('spAddr').value.trim();
+  if(!name){ showSpErr('请先填写景点名称，再点自动定位。'); return; }
+  box.classList.remove('hidden');
+  box.innerHTML = '<div style="color:#6b7280">检索中…</div>';
+  const uniq = await doGeocode(name, addr);
+  if(!uniq.length){
+    box.innerHTML = '<div style="color:#b42318">没检索到结果（可能是网络/服务限制）。可点「📌 在地图上取点」或手工填经纬度。</div>';
+    return;
+  }
+  box.innerHTML = uniq.slice(0, 8).map((o, i) =>
+    '<div data-i="' + i + '"><span>' + esc(o.title) + '</span><small>' + esc(o.addr) + '　' + o.lat.toFixed(4) + ',' + o.lng.toFixed(4) + '</small></div>'
+  ).join('');
+  box.querySelectorAll('div[data-i]').forEach(el => el.onclick = () => {
+    const o = uniq[+el.dataset.i];
+    document.getElementById('spLat').value = o.lat.toFixed(6);
+    document.getElementById('spLng').value = o.lng.toFixed(6);
+    if(!document.getElementById('spAddr').value.trim() && o.addr) document.getElementById('spAddr').value = o.addr;
+    box.querySelectorAll('div[data-i]').forEach(x => x.classList.toggle('sel', x === el));
+    showSpOk('已填入坐标 ' + o.lat.toFixed(4) + ', ' + o.lng.toFixed(4));
+  });
+};
+
+document.getElementById('btnPick').onclick = () => {
+  if(!mapReady){ showSpErr('地图还没加载好，请稍等或手工填写经纬度。'); return; }
+  picking = true;
+  document.getElementById('spotMask').classList.add('hidden');
+  toast('请在地图上点击目标位置，点完自动回到表单');
+};
+
+/* ============ 事件绑定 ============ */
+document.getElementById('btnAddCat').onclick = () => openCatModal(null);
+document.getElementById('btnAddSpot').onclick = () => openSpotModal(null);
+document.getElementById('btnHelp').onclick = () => document.getElementById('helpMask').classList.remove('hidden');
+document.getElementById('helpClose').onclick = () => document.getElementById('helpMask').classList.add('hidden');
+document.getElementById('btnFit').onclick = fitView;
+document.getElementById('btnFit2').onclick = fitView;
+document.getElementById('btnReset').onclick = () => {
+  currentSpotId = null;
+  document.getElementById('spotSearch').value = '';
+  activeCats = null; renderAll();
+  map.easeTo({ center: new TMap.LatLng(35.0, 104.5), zoom: 4.4 }, { duration: 500 });
+  infoWin.close(); document.getElementById('drawer').classList.remove('open');
+};
+
+document.getElementById('catList').onclick = e => {
+  const item = e.target.closest('.cat-item'); if(!item) return;
+  const btn = e.target.closest('button[data-act]');
+  const id = item.dataset.id;
+  if(btn){
+    const act = btn.dataset.act;
+    if(act === 'edit'){ openCatModal(id); return; }
+    if(act === 'del'){
+      const c = catOf(id);
+      const n = data.spots.filter(s => s.cat === id).length;
+      if(!confirm('删除分类「' + c.name + '」？' + (n ? '该分类下 ' + n + ' 个景点也会一并删除。' : ''))) return;
+      data.spots = data.spots.filter(s => s.cat !== id);
+      data.categories = data.categories.filter(c => c.id !== id);
+      if(activeCats){ activeCats.delete(id); if(!activeCats.size) activeCats = null; }
+      save(); renderAll(); toast('已删除'); return;
+    }
+    if(act === 'only'){ activeCats = new Set([id]); save(); renderAll(); fitView(); return; }
+  }
+  if(item.dataset.all){ activeCats = null; }
+  else if(multiMode){
+    if(!activeCats) activeCats = new Set(data.categories.map(c => c.id));
+    if(activeCats.has(id)) activeCats.delete(id); else activeCats.add(id);
+    if(!activeCats.size || activeCats.size === data.categories.length) activeCats = null;
+  }else{
+    activeCats = new Set([id]);
+  }
+  renderAll();
+  if(activeCats) fitView();
+};
+
+document.getElementById('multiMode').onclick = () => {
+  multiMode = !multiMode;
+  document.getElementById('multiMode').classList.toggle('on', multiMode);
+  if(!multiMode) activeCats = null;
+  renderAll();
+  toast(multiMode ? '已开启多选叠加模式' : '已回到单分类查看模式');
+};
+
+document.getElementById('spotList').onclick = e => {
+  const item = e.target.closest('.spot-item'); if(!item) return;
+  const id = item.dataset.id;
+  const act = (e.target.closest('button[data-act]') || {}).dataset?.act;
+  if(act === 'locate'){ openSpot(id, true); return; }
+  if(act === 'edit'){ openSpotModal(id); return; }
+  if(act === 'del'){
+    const s = spotOf(id);
+    if(!confirm('删除景点「' + s.name + '」？')) return;
+    data.spots = data.spots.filter(s => s.id !== id);
+    if(currentSpotId === id) currentSpotId = null;
+    save(); renderAll(); infoWin.close(); document.getElementById('drawer').classList.remove('open');
+    toast('已删除'); return;
+  }
+  openSpot(id, true); openDrawer(id);
+};
+
+document.getElementById('spotSearch').oninput = () => { renderList(); renderMarkers(); };
+document.getElementById('listFilter').onchange = e => {
+  const v = e.target.value;
+  activeCats = (v === '__all') ? null : new Set([v]);
+  renderAll(); if(activeCats) fitView();
+};
+
+document.getElementById('dClose').onclick = () => document.getElementById('drawer').classList.remove('open');
+document.getElementById('dLocate').onclick = () => openSpot(document.getElementById('drawer').dataset.id, true);
+document.getElementById('dEdit').onclick = () => openSpotModal(document.getElementById('drawer').dataset.id);
+document.getElementById('dDel').onclick = () => {
+  const id = document.getElementById('drawer').dataset.id;
+  const s = spotOf(id); if(!s) return;
+  if(!confirm('删除景点「' + s.name + '」？')) return;
+  data.spots = data.spots.filter(x => x.id !== id);
+  if(currentSpotId === id) currentSpotId = null;
+  save(); renderAll(); infoWin.close(); document.getElementById('drawer').classList.remove('open'); toast('已删除');
+};
+
+/* ============ 底图切换 & 天地图密钥 ============ */
+document.querySelectorAll('.bm').forEach(b => {
+  b.onclick = () => {
+    const mode = b.dataset.bm;
+    applyBaseMap(mode);
+    toast(mode === 'terrain' ? '已切换：地形晕渲图' : (mode === 'satellite' ? '已切换：卫星影像图' : '已切换：标准矢量图'));
+  };
+});
+document.getElementById('tkBtn').onclick = () => {
+  document.getElementById('tkInput').value = tdtTk;
+  document.getElementById('tkMask').classList.remove('hidden');
+};
+document.getElementById('tkCancel').onclick = () => document.getElementById('tkMask').classList.add('hidden');
+document.getElementById('tkSave').onclick = () => {
+  tdtTk = document.getElementById('tkInput').value.trim();
+  try{ localStorage.setItem(TK_STORE, tdtTk); }catch(e){}
+  document.getElementById('tkMask').classList.add('hidden');
+  // 密钥变了要重建图层
+  [terrainLayer, terrainLabel].forEach(l => { try{ if(l && l.destroy) l.destroy(); }catch(e){} });
+  terrainLayer = null; terrainLabel = null;
+  applyBaseMap('terrain');
+  toast(tdtTk ? '密钥已保存，正在加载地形图' : '已清空密钥，回退到卫星影像');
+};
+
+/* 导入导出 */
+document.getElementById('btnExport').onclick = () => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '旅游景点数据_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('已导出 JSON');
+};
+document.getElementById('btnImport').onclick = () => document.getElementById('fileImport').click();
+document.getElementById('fileImport').onchange = e => {
+  const f = e.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try{
+      const d = JSON.parse(rd.result);
+      if(!d || !Array.isArray(d.categories) || !Array.isArray(d.spots)) throw new Error('格式不符');
+      pushSnapshot('导入前自动备份');
+      data = d; activeCats = null; currentSpotId = null;
+      save(); renderAll(); fitView(); toast('已导入 ' + d.spots.length + ' 个景点');
+    }catch(err){ toast('导入失败：' + err.message); }
+    e.target.value = '';
+  };
+  rd.readAsText(f);
+};
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape'){
+    document.querySelectorAll('.mask').forEach(m => m.classList.add('hidden'));
+    document.getElementById('drawer').classList.remove('open');
+  }
+});
+
+/* ============ 账号界面与操作 ============ */
+function acErr(id, msg){ const e = document.getElementById(id); if(e){ e.textContent = '⚠ ' + msg; e.classList.add('show'); } }
+function acClear(id){ const e = document.getElementById(id); if(e){ e.textContent = ''; e.classList.remove('show'); } }
+function acMsg(msg){
+  const e = document.getElementById('acMsg'); if(!e) return;
+  e.textContent = '✓ ' + msg; e.classList.add('show');
+  clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('show'), 3000);
+}
+function autoSnapshot(){
+  const arr = lsGet(snapKey(), []);
+  if(arr.length && Date.now() - arr[0].t < 30 * 60 * 1000) return;
+  pushSnapshot('自动备份');
+}
+
+function renderAcctBtn(){
+  const b = document.getElementById('btnAccount'); if(!b) return;
+  if(currentUser){
+    b.textContent = '👤 ' + currentUser.name;
+    b.classList.add('primary');
+    b.title = '账号：' + currentUser.name + '（点击管理备份 / 密码 / 切换）';
+  }else{
+    b.textContent = '👤 登录 / 注册';
+    b.classList.remove('primary');
+    b.title = '注册账号或登录（不登录也能使用，数据归「游客」）';
+  }
+}
+function renderUserList(){
+  const wrap = document.getElementById('userListWrap'), box = document.getElementById('userList');
+  if(!box || !wrap) return;
+  if(!users.length){ wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  box.innerHTML = users.map(u =>
+    '<div class="u" data-n="' + esc(u.name) + '"><span class="uav">' + esc(String(u.name).slice(0, 1)) + '</span>'
+    + '<span class="ud">' + esc(u.name) + '<small>最后登录 ' + (u.lastLogin ? new Date(u.lastLogin).toLocaleString('zh-CN') : '—') + '</small></span></div>'
+  ).join('');
+  box.querySelectorAll('.u').forEach(el => el.onclick = () => {
+    document.getElementById('lgUser').value = el.dataset.n;
+    document.getElementById('lgPwd').focus();
+  });
+}
+function renderAuth(){
+  const guest = document.getElementById('authGuest'), user = document.getElementById('authUser');
+  const title = document.getElementById('authTitle');
+  if(!guest || !user) return;
+  if(currentUser){
+    guest.classList.add('hidden'); user.classList.remove('hidden');
+    title.textContent = '我的账号';
+    document.getElementById('acAvatar').textContent = String(currentUser.name || '?').trim().slice(0, 1).toUpperCase();
+    document.getElementById('acName').textContent = currentUser.name;
+    document.getElementById('acMeta').textContent =
+      (data.categories.length || 0) + ' 个分类 · ' + (data.spots.length || 0) + ' 个景点 · 注册于 '
+      + new Date(currentUser.createdAt || Date.now()).toLocaleDateString('zh-CN');
+    document.getElementById('acPwdBox').classList.add('hidden');
+    ['pwOld', 'pwNew'].forEach(i => { const el = document.getElementById(i); if(el) el.value = ''; });
+    acClear('pwErr');
+    renderSnapshots();
+  }else{
+    guest.classList.remove('hidden'); user.classList.add('hidden');
+    title.textContent = '登录 / 注册';
+    renderUserList();
+  }
+  renderAcctBtn();
+}
+
+async function doLogin(){
+  acClear('lgErr');
+  const name = document.getElementById('lgUser').value.trim();
+  const pwd = document.getElementById('lgPwd').value;
+  if(!name) return acErr('lgErr', '请输入用户名');
+  if(!pwd) return acErr('lgErr', '请输入密码');
+  const u = findUser(name);
+  if(!u) return acErr('lgErr', '该用户名不存在，请点上方「注册新账号」');
+  const h = await pwdHash(pwd, u.salt);
+  if(h !== u.hash) return acErr('lgErr', '密码不正确');
+  enterUser(u, document.getElementById('lgKeep').checked);
+}
+async function doReg(){
+  acClear('rgErr');
+  const name = document.getElementById('rgUser').value.trim();
+  const pwd = document.getElementById('rgPwd').value;
+  const pwd2 = document.getElementById('rgPwd2').value;
+  if([...name].length < 2) return acErr('rgErr', '用户名至少 2 个字符');
+  if([...name].length > 16) return acErr('rgErr', '用户名最多 16 个字符');
+  if(findUser(name)) return acErr('rgErr', '该用户名已被注册，换一个或直接登录');
+  if(pwd.length < 6) return acErr('rgErr', '密码至少 6 位');
+  if(pwd !== pwd2) return acErr('rgErr', '两次输入的密码不一致');
+  const salt = mkSalt();
+  const u = {
+    id: uid2('u'), name, salt, hash: await pwdHash(pwd, salt),
+    createdAt: Date.now(), lastLogin: Date.now(),
+    __carry: document.getElementById('rgCarry').checked
+  };
+  users.push(u); lsSet(U_STORE, users);
+  enterUser(u, true);
+}
+function enterUser(u, keep){
+  currentUser = u;
+  u.lastLogin = Date.now();
+  data = load();
+  delete u.__carry; lsSet(U_STORE, users);
+  (function(){ let ch = false; data.categories.forEach(c => { if(!c.shape){ c.shape = guessShape(c.name); ch = true; } }); if(ch) save(); })();
+  if(keep) lsSet(S_STORE, { uid: u.id, name: u.name, t: Date.now() });
+  else { try{ localStorage.removeItem(S_STORE); }catch(e){} session = null; }
+  activeCats = null; currentSpotId = null;
+  document.getElementById('drawer').classList.remove('open');
+  if(mapReady){ try{ infoWin.close(); }catch(e){} }
+  autoSnapshot();
+  renderAll(); if(mapReady) fitView();
+  document.getElementById('authMask').classList.add('hidden');
+  toast('已登录：' + u.name);
+  renderAcctBtn();
+}
+function doLogout(){
+  currentUser = null; session = null;
+  try{ localStorage.removeItem(S_STORE); }catch(e){}
+  data = load();
+  activeCats = null; currentSpotId = null;
+  document.getElementById('drawer').classList.remove('open');
+  if(mapReady){ try{ infoWin.close(); }catch(e){} }
+  renderAll(); if(mapReady) fitView();
+  renderAuth(); setAuthTab('login');
+  document.getElementById('lgUser').value = '';
+  document.getElementById('lgPwd').value = '';
+  toast('已退出，当前为「游客」模式');
+}
+function switchAccount(){
+  doLogout();
+  document.getElementById('authMask').classList.remove('hidden');
+  renderAuth();
+}
+
+document.getElementById('btnAccount').onclick = () => {
+  renderAuth();
+  document.getElementById('authMask').classList.remove('hidden');
+};
+document.getElementById('authClose').onclick = () => document.getElementById('authMask').classList.add('hidden');
+document.getElementById('authSeg').onclick = e => {
+  const b = e.target.closest('button[data-tab]'); if(!b) return;
+  document.getElementById('authSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  const isLogin = b.dataset.tab === 'login';
+  document.getElementById('paneLogin').classList.toggle('hidden', !isLogin);
+  document.getElementById('paneReg').classList.toggle('hidden', isLogin);
+  acClear('lgErr'); acClear('rgErr');
+};
+function setAuthTab(tab){
+  const seg = document.getElementById('authSeg');
+  if(!seg) return;
+  seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  document.getElementById('paneLogin').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('paneReg').classList.toggle('hidden', tab !== 'reg');
+  acClear('lgErr'); acClear('rgErr');
+}
+document.getElementById('lgBtn').onclick = doLogin;
+document.getElementById('rgBtn').onclick = doReg;
+document.getElementById('lgPwd').onkeydown = e => { if(e.key === 'Enter') doLogin(); };
+document.getElementById('rgPwd2').onkeydown = e => { if(e.key === 'Enter') doReg(); };
+document.getElementById('acLogout').onclick = () => { if(confirm('退出登录？退出后切换到「游客」数据，你的账号数据仍保留在本机。')) doLogout(); };
+document.getElementById('acSwitch').onclick = switchAccount;
+document.getElementById('acBackup').onclick = () => { pushSnapshot('手动备份'); renderSnapshots(); acMsg('已创建备份点'); };
+document.getElementById('acExport').onclick = () => document.getElementById('btnExport').click();
+document.getElementById('acPwd').onclick = () => {
+  const box = document.getElementById('acPwdBox');
+  box.classList.toggle('hidden');
+  if(!box.classList.contains('hidden')) document.getElementById('pwOld').focus();
+};
+document.getElementById('pwSave').onclick = async () => {
+  acClear('pwErr');
+  const old = document.getElementById('pwOld').value;
+  const np = document.getElementById('pwNew').value;
+  if(!currentUser) return;
+  if((await pwdHash(old, currentUser.salt)) !== currentUser.hash) return acErr('pwErr', '原密码不正确');
+  if(np.length < 6) return acErr('pwErr', '新密码至少 6 位');
+  currentUser.salt = mkSalt();
+  currentUser.hash = await pwdHash(np, currentUser.salt);
+  lsSet(U_STORE, users);
+  document.getElementById('pwOld').value = ''; document.getElementById('pwNew').value = '';
+  document.getElementById('acPwdBox').classList.add('hidden');
+  acMsg('密码已修改，下次登录请用新密码');
+};
+document.getElementById('acDel').onclick = () => {
+  if(!currentUser) return;
+  const n = (data.spots || []).length;
+  if(!confirm('删除账号「' + currentUser.name + '」？该账号下 ' + n + ' 个景点与分类数据将一并删除，且无法恢复。')) return;
+  if(!confirm('请再次确认：真的要删除吗？建议先点「导出 JSON」备份。')) return;
+  const id = currentUser.id;
+  try{
+    localStorage.removeItem(STORE + '_u_' + id);
+    localStorage.removeItem(STORE + '_u_' + id + '_snaps');
+  }catch(e){}
+  users = users.filter(u => u.id !== id); lsSet(U_STORE, users);
+  currentUser = null; session = null;
+  try{ localStorage.removeItem(S_STORE); }catch(e){}
+  data = load(); activeCats = null; currentSpotId = null;
+  renderAll(); if(mapReady) fitView();
+  renderAuth();
+  toast('账号已删除');
+};
+
+/* ============ 启动 ============ */
+/* 关键：先渲染界面（列表/分类与地图无关），地图加载失败也不影响录入 */
+function renderUI(){
+  renderStat(); renderCats(); renderFilterSelect(); renderList();
+}
+function tryInitMap(){
+  try{ initMap(); }
+  catch(e){
+    console.error('地图初始化失败', e);
+    mapReady = false;
+    toast('地图未能加载（不影响录入，可稍后刷新重试）');
+    renderMarkersSafe();
+  }
+}
+function renderMarkersSafe(){ if(mapReady){ try{ renderMarkers(); }catch(e){} } }
+(function boot(){
+  renderUI();
+  renderAuth();
+  autoSnapshot();
+  if(location.protocol === 'file:'){
+    const w = document.getElementById('fileWarn');
+    if(w) w.style.display = 'block';
+  }
+  if(window.TMap && TMap.Map){ tryInitMap(); }
+  else{
+    let tries = 0;
+    const t = setInterval(() => {
+      if(window.TMap && TMap.Map){ clearInterval(t); tryInitMap(); }
+      else if(++tries > 60){ clearInterval(t); toast('地图 SDK 加载失败：请检查网络，录入功能仍可正常使用'); }
+    }, 300);
+  }
+})();
+</script>
+</body>
+</html>
